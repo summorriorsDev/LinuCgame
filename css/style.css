@@ -221,6 +221,15 @@ label.f { display: block; margin: 10px 0 4px; color: var(--sub); font-size: .85r
 textarea.f-in { min-height: 76px; resize: vertical; }
 .f-in:focus { outline: none; border-color: var(--blue); }
 
+/* ---- 書き出し忘れ防止バー ---- */
+#savebar {
+  position: sticky; top: 0; z-index: 40;
+  display: flex; gap: 8px; align-items: center; justify-content: center; flex-wrap: wrap;
+  background: #3a2f0b; border-bottom: 2px solid var(--gold); color: var(--gold);
+  padding: 6px 12px; font-size: .85rem; font-weight: 700; text-align: center;
+}
+#savebar[hidden] { display: none; }
+
 /* ---- modal / toast ---- */
 #modal { position: fixed; inset: 0; background: rgba(4,7,16,.78); display: grid; place-items: center; z-index: 50; padding: 16px; }
 #modal .box { background: var(--panel); border: 2px solid var(--line); border-radius: var(--radius); max-width: 640px; width: 100%; max-height: 88vh; overflow: auto; padding: 18px; }

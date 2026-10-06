@@ -20,7 +20,8 @@
       v: 1, name: 'ゆうしゃ', exp: 0,
       items: { hint: 3, potion: 1 },
       stats: { answered: 0, correct: 0, bestCombo: 0, days: {} },
-      q: {}, clears: {}, mocks: [], custom: [], sound: true, seenIntro: false
+      q: {}, clears: {}, mocks: [], custom: [], sound: true, seenIntro: false,
+      exportedFp: '', exportReminder: true
     };
   }
   function load() {
@@ -38,8 +39,25 @@
   function save() {
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); }
     catch (e) { if (storageOk) { storageOk = false; toast('⚠ このブラウザでは進捗を保存できません'); } }
+    updateSaveBar();
   }
   var S = load();
+
+  /* ---- 書き出し忘れ防止 ----
+     進捗の指紋（回答数・EXP・自作問題数・模擬試験数）が、最後に書き出した時点と違えば「未書き出し」。 */
+  var barDismissedFp = null;
+  function fp() { return [S.stats.answered, S.exp, S.custom.length, S.mocks.length].join(':'); }
+  function isDirty() { return S.exportReminder && S.stats.answered > 0 && fp() !== S.exportedFp; }
+  function updateSaveBar() {
+    var bar = document.getElementById('savebar');
+    if (!bar) return;
+    if (!isDirty() || barDismissedFp === fp()) { bar.hidden = true; return; }
+    bar.hidden = false;
+    bar.innerHTML = '<span>⚠ 前回の書き出し以降、進捗が更新されています（このブラウザにだけ保存中）</span>' +
+      '<button class="btn sm" id="sbExport">書き出す</button><button class="btn sm ghost" id="sbClose" title="次に進捗が変わるまで隠す">×</button>';
+    document.getElementById('sbExport').onclick = function () { showStats(true); };
+    document.getElementById('sbClose').onclick = function () { barDismissedFp = fp(); bar.hidden = true; };
+  }
 
   var BANK = [];
   function buildBank() {
@@ -674,7 +692,7 @@
   }
 
   /* ================= 戦績・設定 ================= */
-  function showStats() {
+  function showStats(autoExport) {
     stopTimer();
     var st = S.stats, acc = st.answered ? st.correct / st.answered : 0;
     var h = '<div class="row between" style="margin-bottom:10px"><h2>📊 戦績・設定</h2><button class="btn" id="home">← ホームへ</button></div>';
@@ -718,6 +736,7 @@
     h += '<div class="card"><b>💾 セーブデータ</b><div class="muted small">別のPCやブラウザに移すときは、書き出した文字列を取り込みます。</div>' +
       '<div class="row" style="margin-top:8px"><button class="btn" id="exp">書き出す</button><button class="btn" id="imp">取り込む</button>' +
       '<button class="btn" id="rename">名前を変える</button><button class="btn danger" id="reset">全データ削除</button></div>' +
+      '<label class="row small" style="margin-top:10px;gap:8px;cursor:pointer"><input type="checkbox" id="remind"' + (S.exportReminder ? ' checked' : '') + '> 書き出し忘れ防止（未書き出しの進捗があるとき、画面上部の帯と、閉じるときの確認を出す）</label>' +
       '<textarea class="f-in" id="io" style="margin-top:8px" placeholder="ここに書き出し／貼り付け"></textarea></div>';
     view(h);
 
@@ -728,15 +747,19 @@
     });
     var io = document.getElementById('io');
     document.getElementById('exp').onclick = function () {
+      S.exportedFp = fp(); save();
       io.value = JSON.stringify(S); io.select();
-      try { if (navigator.clipboard) navigator.clipboard.writeText(io.value); toast('書き出しました（コピー済み）'); } catch (e) { toast('書き出しました'); }
+      try { if (navigator.clipboard) navigator.clipboard.writeText(io.value); toast('書き出しました（コピー済み）。メモなどに貼って保管してください'); } catch (e) { toast('書き出しました。上の欄の文字列を保管してください'); }
     };
+    document.getElementById('remind').onchange = function (e) { S.exportReminder = e.target.checked; save(); };
+    if (autoExport) document.getElementById('exp').click();
     document.getElementById('imp').onclick = function () {
       try {
         var o = JSON.parse(io.value);
         if (!o || o.v !== 1) throw new Error('bad');
         if (!confirm('現在のデータを取り込んだデータで置き換えます。よろしいですか？')) return;
         S = o; var d = defaultSave(); Object.keys(d).forEach(function (k) { if (S[k] === undefined) S[k] = d[k]; });
+        S.exportedFp = fp();   // 取り込んだ内容は書き出し済みと同じ状態
         save(); buildBank(); toast('取り込みました'); showStats();
       } catch (e) { toast('取り込めませんでした（形式が違います）'); }
     };
@@ -783,6 +806,12 @@
     }
   });
 
-  window.addEventListener('beforeunload', save);
+  // 未書き出しの進捗があるときは、ページを閉じる前にブラウザの確認ダイアログを出す
+  // （文言はブラウザ標準で、変更できない）
+  window.addEventListener('beforeunload', function (e) {
+    save();
+    if (isDirty()) { e.preventDefault(); e.returnValue = ''; return ''; }
+  });
+  updateSaveBar();
   showHome();
 })();
