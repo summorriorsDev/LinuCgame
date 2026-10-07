@@ -221,6 +221,33 @@ label.f { display: block; margin: 10px 0 4px; color: var(--sub); font-size: .85r
 textarea.f-in { min-height: 76px; resize: vertical; }
 .f-in:focus { outline: none; border-color: var(--blue); }
 
+/* ---- 章タブ / ガイド / コードブロック ---- */
+.tabs { display: flex; gap: 8px; margin-bottom: 14px; overflow-x: auto; padding-bottom: 2px; }
+.tab {
+  flex: 1 1 0; min-width: 120px; text-align: left; line-height: 1.3;
+  background: var(--panel); border: 2px solid var(--line); border-radius: 10px; padding: 8px 10px;
+  display: flex; flex-direction: column; gap: 1px; transition: background .12s, border-color .12s;
+}
+.tab span { font-weight: 800; }
+.tab small { color: var(--sub); font-size: .74rem; }
+.tab i { font-style: normal; color: var(--green); font-size: .78rem; font-weight: 700; }
+.tab:hover { background: var(--panel2); }
+.tab.active { border-color: var(--gold); background: #2a2f55; box-shadow: 0 3px 0 rgba(0,0,0,.35); }
+.chhead { border-color: #4b5ca6; }
+.guide h3 { margin-bottom: 8px; font-size: 1.05rem; }
+.guide ul { margin: 6px 0 8px; padding-left: 20px; }
+.guide li { margin: 6px 0; }
+.guide .gmap { margin-bottom: 8px; }
+.guide .gmap ul { margin: 2px 0; }
+.guide .id { color: var(--sub); font-family: var(--mono); font-size: .8rem; }
+.readchk { gap: 6px; margin-top: 8px; cursor: pointer; color: var(--sub); }
+pre.blk {
+  font-family: var(--mono); font-size: .86rem; line-height: 1.5; white-space: pre; overflow-x: auto;
+  background: #070b16; border: 1px solid #2b3a6e; border-radius: 8px; padding: 10px 12px; margin: 8px 0;
+  color: #d8ffe6; font-weight: 400;
+}
+.miss pre.blk, .fb pre.blk { font-size: .82rem; }
+
 /* ---- 書き出し忘れ防止バー ---- */
 #savebar {
   position: sticky; top: 0; z-index: 40;

@@ -61,14 +61,33 @@ window.TOPICS = [
    qi(小主題, 問題, 正解コマンド(文字列 or 配列), 解説, hard?)  … コマンド入力
    問題文・解説では `バッククォート` で囲むとコード表示になる。 */
 window.QUESTIONS = [];
+/* 章の定義。第1章=基礎固め（一問一答）、第2章=実戦演習（試験形式・毎回変わる問題）。
+   問題ファイルの先頭で window.__ch = 2 のようにすると、以降に登録する問題がその章になる（既定は第1章）。
+   ★第1章の問題の文面・ID は変更しないこと（進捗データが問題文のハッシュで紐づいているため）。 */
+window.CHAPTERS = [
+  { id: 0, name: '第0章', sub: '試験ガイド', icon: '🧭' },
+  { id: 1, name: '第1章', sub: '基礎固め（一問一答）', icon: '📘' },
+  { id: 2, name: '第2章', sub: '実戦演習（試験形式・毎回変わる問題）', icon: '⚔️' },
+  { id: 3, name: '自作ノート', sub: '自分で追加した問題', icon: '✏️' }
+];
 (function () {
   function hash(s) {
     var h = 5381;
     for (var i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
     return h.toString(36);
   }
-  function add(o) { o.id = o.t + '-' + hash(o.q); window.QUESTIONS.push(o); }
+  function add(o) {
+    o.ch = window.__ch || 1;
+    o.id = (o.ch === 1 ? '' : 'c' + o.ch + '-') + o.t + '-' + hash(o.q);
+    window.QUESTIONS.push(o);
+  }
   window.qc = function (t, q, o, a, e, hard) { add({ t: t, type: 'choice', q: q, o: o, a: a, e: e || '', hard: !!hard }); };
   window.qm = function (t, q, o, a, e, hard) { add({ t: t, type: 'multi', q: q, o: o, a: a, e: e || '', hard: !!hard }); };
   window.qi = function (t, q, ans, e, hard) { add({ t: t, type: 'input', q: q, ans: [].concat(ans), e: e || '', hard: !!hard }); };
+  /* qg(小主題, キー, 生成関数, hard?) … 出題のたびに数値・文字列が変わる問題。
+     生成関数は { type, q, o, a, e }（または ans）を返す。 */
+  window.qg = function (t, key, fn, hard) {
+    var ch = window.__ch || 1;
+    window.QUESTIONS.push({ t: t, type: 'gen', gen: fn, hard: !!hard, ch: ch, id: 'c' + ch + 'g-' + t + '-' + key });
+  };
 })();

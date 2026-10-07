@@ -1,16 +1,26 @@
 /* LinuC 101 ターミナル・クエスト — ゲーム本体
-   進捗は localStorage に保存（このブラウザのみ）。 */
+   進捗は localStorage に保存（このブラウザのみ）。
+   章：第0章=試験ガイド（読み物）／第1章=基礎固め／第2章=実戦演習／自作ノート（第3区分）。章ごとに別集計。 */
 (function () {
   'use strict';
 
   /* ================= データ準備 ================= */
   var TOPICS = window.TOPICS;
   var MEMOS = window.MEMOS || {};
+  var CHAPTERS = window.CHAPTERS;
+  var GUIDE = window.GUIDE || [];
   var SUBS = [];
   var subById = {};
   TOPICS.forEach(function (t) {
     t.subs.forEach(function (s) { s.area = t; SUBS.push(s); subById[s.id] = s; });
   });
+  var chById = {};
+  CHAPTERS.forEach(function (c) { chById[c.id] = c; });
+  var CH_DESC = {
+    1: '一問一答で基本を覚える章です。繰り返すと答えを覚えてしまうので、知識をつける用（1〜2周）と考えて、仕上げは第2章で。',
+    2: '試験に近い形式（出力の読み取り・誤りを選ぶ・複数選択など）と、出題のたびに数値や文字列が変わる問題の章です。実力は「初見正答率」で見ます。',
+    3: '自分で追加した問題です。他の章とは混ざりません。'
+  };
 
   var SAVE_KEY = 'linuc101rpg.v1';
   var PASS_RATE = 500 / 800;
@@ -21,7 +31,7 @@
       items: { hint: 3, potion: 1 },
       stats: { answered: 0, correct: 0, bestCombo: 0, days: {} },
       q: {}, clears: {}, mocks: [], custom: [], sound: true, seenIntro: false,
-      exportedFp: '', exportReminder: true
+      exportedFp: '', exportReminder: true, chapter: 1, guideRead: {}
     };
   }
   function load() {
@@ -63,7 +73,7 @@
   function buildBank() {
     BANK = window.QUESTIONS.slice();
     // 自作問題は複製して使う（q.sub を付けても保存データが循環参照にならないように）
-    S.custom.forEach(function (c) { BANK.push(Object.assign({}, c)); });
+    S.custom.forEach(function (c) { BANK.push(Object.assign({}, c, { ch: 3, custom: true })); });
     BANK.forEach(function (q) { q.sub = subById[q.t]; });
   }
   buildBank();
@@ -71,10 +81,21 @@
   /* ================= 小物 ================= */
   var app = document.getElementById('app');
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
-  function fmt(s) {
+  function inline(s) {
     return esc(s)
       .replace(/`([^`]+)`/g, '<code>$1</code>')
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  }
+  /* ``` で囲んだ部分はコードブロック、それ以外は `コード` と **強調** を変換する */
+  function fmt(s) {
+    var parts = String(s).split('```');
+    if (parts.length < 3) return inline(s);
+    return parts.map(function (p, i) {
+      if (i % 2 === 1) return '<pre class="blk">' + esc(p.replace(/^\n/, '').replace(/\n$/, '')) + '</pre>';
+      if (i > 0) p = p.replace(/^\n/, '');
+      if (i < parts.length - 1) p = p.replace(/\n$/, '');
+      return inline(p);
+    }).join('');
   }
   function view(html) { app.innerHTML = html; window.scrollTo(0, 0); }
   function toast(msg, ms) {
@@ -138,32 +159,46 @@
   }
   var SFX = { ok: [660, 880], ng: [220, 160], lv: [523, 659, 784, 1046], clear: [523, 659, 784, 659, 1046] };
 
-  /* ================= 成長・習熟 ================= */
+  /* ================= 成長・習熟（章ごとに別集計） ================= */
   function levelOf(exp) { return Math.floor(Math.sqrt(exp / 25)) + 1; }
   function expAt(L) { return 25 * (L - 1) * (L - 1); }
   function maxHpOf(L) { return 80 + 10 * L; }
   var TITLES = [[1, '見習いペンギン'], [3, 'ターミナル見習い'], [5, 'シェルの冒険者'], [8, 'パイプの騎士'], [11, 'rootの賢者'], [15, 'LinuC勇者']];
   function titleOf(L) { var t = TITLES[0][1]; TITLES.forEach(function (x) { if (L >= x[0]) t = x[1]; }); return t; }
 
+  function chapterList() { return CHAPTERS.filter(function (c) { return c.id !== 3 || S.custom.length > 0; }); }
+  function curCh() {
+    var c = S.chapter;
+    if (!chById[c] || (c === 3 && !S.custom.length)) c = 1;
+    return c;
+  }
+  function chQs(ch) { return BANK.filter(function (q) { return q.ch === ch; }); }
+  function subQs(id, ch) { return BANK.filter(function (q) { return q.t === id && q.ch === ch; }); }
+  function clearKey(id, ch) { return ch === 1 ? id : ch + ':' + id; }
   function qBox(q) { var s = S.q[q.id]; return s ? s.box : 0; }
-  function subQs(id) { return BANK.filter(function (q) { return q.t === id; }); }
-  function mastery(id) {
-    var qs = subQs(id); if (!qs.length) return 0;
+  function seenOf(q) { var s = S.q[q.id]; return s ? s.seen : 0; }
+  function mastery(id, ch) {
+    var qs = subQs(id, ch); if (!qs.length) return 0;
     return qs.reduce(function (a, q) { return a + Math.min(qBox(q), 3) / 3; }, 0) / qs.length;
   }
-  function overall() {
+  function overall(ch) {
     var num = 0, den = 0;
-    SUBS.forEach(function (s) { num += mastery(s.id) * s.w; den += s.w; });
+    SUBS.forEach(function (s) { if (subQs(s.id, ch).length) { num += mastery(s.id, ch) * s.w; den += s.w; } });
     return den ? num / den : 0;
   }
-  function reviewPool() {
-    return BANK.filter(function (q) { var s = S.q[q.id]; return s && s.ng > 0 && s.box < 3; });
+  function firstStats(ch) {
+    var n = 0, ok = 0;
+    chQs(ch).forEach(function (q) { var s = S.q[q.id]; if (s && s.first !== undefined) { n++; ok += s.first; } });
+    return { n: n, ok: ok, rate: n ? ok / n : 0 };
   }
-  function recommend() {
+  function reviewPool(ch) {
+    return chQs(ch).filter(function (q) { var s = S.q[q.id]; return s && s.ng > 0 && s.box < 3; });
+  }
+  function recommend(ch) {
     var best = null, bs = -1;
-    SUBS.forEach(function (s) {
-      if (!subQs(s.id).length) return;
-      var sc = s.w * (1 - mastery(s.id)) + (4 - SUBS.indexOf(s) * 0.001);
+    SUBS.forEach(function (s, i) {
+      if (!subQs(s.id, ch).length) return;
+      var sc = s.w * (1 - mastery(s.id, ch)) - i * 0.001;
       if (sc > bs) { bs = sc; best = s; }
     });
     return best;
@@ -173,6 +208,7 @@
   function recordAnswer(q, ok) {
     var st = S.q[q.id] || (S.q[q.id] = { box: 0, seen: 0, ok: 0, ng: 0, last: 0 });
     st.seen++; st.last = Date.now();
+    if (st.seen === 1) st.first = ok ? 1 : 0;       // 初見の正誤（転移の指標）
     if (ok) { st.ok++; st.box = (st.seen === 1) ? 2 : Math.min(4, st.box + 1); }
     else { st.ng++; st.box = 0; }
     S.stats.answered++; if (ok) S.stats.correct++;
@@ -192,6 +228,12 @@
   }
 
   /* ================= 出題の準備・判定 ================= */
+  /* 生成問題（type:'gen'）は、出題のたびに内容を作り直す */
+  function inst(b) {
+    if (b.type !== 'gen') return b;
+    var g = b.gen();
+    return Object.assign({}, g, { id: b.id, t: b.t, ch: b.ch, sub: b.sub, hard: b.hard, base: b });
+  }
   function prepare(q) {
     var v = { q: q, sel: new Set(), gone: new Set(), input: '' };
     if (q.type === 'choice' || q.type === 'multi') {
@@ -214,8 +256,8 @@
     return q.ans.some(function (a) { return norm(a) === val; });
   }
   function correctText(q) {
-    if (q.type === 'choice') return fmt(q.o[q.a]);
-    if (q.type === 'multi') return q.a.map(function (i) { return fmt(q.o[i]); }).join(' ／ ');
+    if (q.type === 'choice') return inline(q.o[q.a]);
+    if (q.type === 'multi') return q.a.map(function (i) { return inline(q.o[i]); }).join(' ／ ');
     return '<code>' + esc(q.ans[0]) + '</code>' + (q.ans.length > 1 ? ' <span class="muted small">（他の書き方も正解になる場合があります）</span>' : '');
   }
   function typeLabel(q) {
@@ -224,7 +266,7 @@
     return '単一選択';
   }
 
-  /* ================= 画面: ホーム ================= */
+  /* ================= 画面: ホーム／章 ================= */
   var B = null;           // バトル状態
   var timer = null;
   function stopTimer() { if (timer) { clearInterval(timer); timer = null; } }
@@ -236,35 +278,58 @@
       '<div class="muted small">EXP ' + S.exp + ' ／ 次のレベルまで あと ' + (b - S.exp) + '</div>';
   }
 
-  function showHome() {
-    stopTimer(); B = null;
-    var L = levelOf(S.exp), ov = overall(), rec = recommend(), rv = reviewPool().length;
-    var tdy = S.stats.days[today()] || 0, st = streak();
-    var h = '';
-    h += '<div class="card hero-card"><div class="row">' +
+  function tabsHTML(cur) {
+    return '<div class="tabs" role="tablist">' + chapterList().map(function (c) {
+      var sub = c.id === 0 ? ('読了 ' + GUIDE.filter(function (g) { return S.guideRead[g.id]; }).length + '/' + GUIDE.length)
+        : ('習熟 ' + pct(overall(c.id)) + '%');
+      return '<button class="tab' + (c.id === cur ? ' active' : '') + '" role="tab" data-ch="' + c.id + '">' +
+        '<span>' + c.icon + ' ' + c.name + '</span><small>' + esc(c.sub) + '</small><i>' + sub + '</i></button>';
+    }).join('') + '</div>';
+  }
+
+  function heroHTML() {
+    var L = levelOf(S.exp), tdy = S.stats.days[today()] || 0, st = streak();
+    return '<div class="card hero-card"><div class="row">' +
       '<div class="avatar">🐧</div>' +
       '<div class="grow"><div class="row between"><div><span class="lvl">Lv.' + L + '</span> <span class="title-badge">『' + titleOf(L) + '』</span> <span class="muted">' + esc(S.name) + '</span></div>' +
       '<button class="btn sm ghost" id="sndBtn" title="効果音">' + (S.sound ? '🔊' : '🔇') + '</button></div>' +
       expBarHTML() + '</div></div>' +
       '<div class="stat-chips">' +
-      '<span class="chip">総合習熟度 <b>' + pct(ov) + '%</b></span>' +
       '<span class="chip">今日 <b>' + tdy + '</b> 問</span>' +
       '<span class="chip">連続 <b>' + st + '</b> 日</span>' +
       '<span class="chip">📖 ヒント <b>' + S.items.hint + '</b></span>' +
       '<span class="chip">🧪 ポーション <b>' + S.items.potion + '</b></span>' +
       '</div></div>';
+  }
+
+  function showHome() {
+    stopTimer(); B = null;
+    var ch = curCh();
+    if (ch === 0) { showGuide(); return; }
+    var c = chById[ch], rec = recommend(ch), rv = reviewPool(ch).length;
+    var fs = firstStats(ch), ov = overall(ch), total = chQs(ch).length;
+    var gens = chQs(ch).filter(function (q) { return q.type === 'gen'; }).length;
+    var h = heroHTML() + tabsHTML(ch);
 
     if (!S.seenIntro) {
       h += '<div class="card"><b>🎮 あそびかた</b><ul style="margin:6px 0 0;padding-left:20px">' +
         '<li>ステージを選ぶと敵（＝問題）が現れます。<b>正解でダメージ、不正解でこちらがダメージ</b>。</li>' +
         '<li>間違えた問題は同じ戦闘の最後に<b>もう一度</b>出ます。解説を読めば、そのまま覚えられます。</li>' +
         '<li>最短ルートは「<b>おすすめ</b>」ボタン。重要度が高く、まだ苦手な分野から順に出題します。</li>' +
+        '<li>まずは <b>第0章（試験ガイド）</b> を数分で読むのがおすすめです。</li>' +
         '</ul><div style="margin-top:8px"><button class="btn sm" id="introOk">わかった！</button></div></div>';
     }
 
+    h += '<div class="card chhead"><div class="row between"><b style="font-size:1.1rem">' + c.icon + ' ' + c.name + '　' + esc(c.sub) + '</b></div>' +
+      '<div class="muted small" style="margin:4px 0 8px">' + CH_DESC[ch] + '</div>' +
+      '<div class="stat-chips" style="margin:0">' +
+      '<span class="chip">習熟度 <b>' + pct(ov) + '%</b></span>' +
+      '<span class="chip" title="各問題を初めて解いたときの正答率。暗記の影響を受けない実力の目安">初見正答率 <b>' + (fs.n ? pct(fs.rate) + '%' : '—') + '</b>' + (fs.n ? '（' + fs.ok + '/' + fs.n + '）' : '') + '</span>' +
+      '<span class="chip">問題 <b>' + total + '</b>' + (gens ? '（毎回変わる問題 ' + gens + '）' : '') + '</span></div></div>';
+
     if (rec) {
-      var rm = mastery(rec.id);
-      h += '<div class="card recommend"><div class="muted small">⭐ 最短ルートの次の一手</div>' +
+      var rm = mastery(rec.id, ch);
+      h += '<div class="card recommend"><div class="muted small">⭐ ' + c.name + ' 最短ルートの次の一手</div>' +
         '<div style="font-weight:800;font-size:1.1rem">' + rec.mon + ' ' + rec.id + ' ' + esc(rec.name) + '</div>' +
         '<div class="muted small">重要度 <span class="star-w">' + stars(rec.w) + '</span> ／ 習熟度 ' + pct(rm) + '%</div>' +
         '<div class="row"><button class="btn primary big" data-stage="' + rec.id + '">⚔️ おすすめに挑戦</button>' +
@@ -272,18 +337,20 @@
     }
 
     h += '<div class="menu">' +
-      '<button class="btn" id="mRandom">🎲 ランダム修行<small>全分野から10問</small></button>' +
+      '<button class="btn" id="mRandom">🎲 ランダム修行<small>' + c.name + 'から10問</small></button>' +
       '<button class="btn" id="mReview">📖 復習の洞窟' + (rv ? '<span class="badge">' + rv + '</span>' : '') + '<small>間違えた問題を克服</small></button>' +
-      '<button class="btn" id="mMock">👹 魔王城（模擬試験）<small>本番形式で実力チェック</small></button>' +
+      '<button class="btn" id="mMock">👹 魔王城（模擬試験）<small>' + c.name + 'から出題</small></button>' +
       '<button class="btn" id="mStats">📊 戦績・設定<small>自作問題・データ管理</small></button>' +
       '</div>';
 
     TOPICS.forEach(function (t) {
+      var rows = t.subs.filter(function (s) { return subQs(s.id, ch).length; });
+      if (!rows.length) return;
       h += '<div class="card area"><h3>' + t.icon + ' ' + esc(t.name) + ' <span class="muted small">主題' + t.id + '</span></h3>' +
         '<div class="full">' + esc(t.full) + '</div>';
-      t.subs.forEach(function (s) {
-        var m = mastery(s.id), n = subQs(s.id).length, c = S.clears[s.id] || 0;
-        var star = '<span class="stars">' + '★'.repeat(c) + '<span class="off">' + '★'.repeat(3 - c) + '</span></span>';
+      rows.forEach(function (s) {
+        var m = mastery(s.id, ch), n = subQs(s.id, ch).length, cl = S.clears[clearKey(s.id, ch)] || 0;
+        var star = '<span class="stars">' + '★'.repeat(cl) + '<span class="off">' + '★'.repeat(3 - cl) + '</span></span>';
         h += '<div class="stage"><div><div class="nm"><span class="id">' + s.id + '</span>' + s.mon + ' ' + esc(s.name) +
           (s.w === 4 ? '<span class="tag">最優先</span>' : '') + '</div>' +
           '<div class="meta"><span class="star-w" title="重要度">' + stars(s.w) + '</span><span>' + n + '問</span><span>習熟 ' + pct(m) + '%</span>' + star + '</div></div>' +
@@ -297,9 +364,9 @@
     h += '<details class="card tips"><summary>🧭 最短合格のコツ</summary><ul>' +
       '<li>LinuC-1 101試験は <b>60問・90分</b>、合格目安は<b>500/800点（約62.5%）</b>。範囲は5主題・21小主題。</li>' +
       '<li>重要度★4（最優先タグ）: 1.01.1〜1.01.3 / 1.03.1 / 1.03.3 / 1.05.2 / 1.05.3 から先に。</li>' +
-      '<li>コマンドの<b>オプションの意味</b>と<b>ファイルの場所</b>が頻出。「似た名前の違い」（<code>ssh -p</code>と<code>scp -P</code>、<code>umount</code>の綴り等）に注意。</li>' +
-      '<li>総合習熟度が <b>70%</b> を超えたら魔王城（模擬試験）で確認 → 間違えた問題は復習の洞窟へ。</li>' +
-      '<li>1日10〜20分でも毎日続ける方が、まとめてやるより定着します。</li></ul>' +
+      '<li>同じ問題を繰り返すと答えを覚えてしまい、点数が実力以上に出ます。<b>第2章の初見正答率</b>と模擬試験で実力を測りましょう。</li>' +
+      '<li>間違えた問題は、問題文ではなく<b>「何の知識が足りなかったか」</b>で覚える。</li>' +
+      '</ul>' +
       '<div class="muted small">※ 出題範囲・合格基準は <a href="https://linuc.org/" target="_blank" rel="noopener" style="color:var(--blue)">LPI-Japan 公式サイト</a> で最新情報を確認してください。</div></details>';
 
     view(h);
@@ -307,65 +374,98 @@
   }
 
   function bindHome() {
-    app.querySelectorAll('[data-stage]').forEach(function (b) { b.onclick = function () { startStage(b.dataset.stage); }; });
-    app.querySelectorAll('[data-memo]').forEach(function (b) { b.onclick = function () { showMemo(b.dataset.memo); }; });
+    var ch = curCh();
+    app.querySelectorAll('[data-stage]').forEach(function (b) { b.onclick = function () { startStage(b.dataset.stage, ch); }; });
+    app.querySelectorAll('[data-memo]').forEach(function (b) { b.onclick = function () { showMemo(b.dataset.memo, ch); }; });
+    app.querySelectorAll('[data-ch]').forEach(function (b) { b.onclick = function () { S.chapter = +b.dataset.ch; save(); showHome(); }; });
     var el;
-    if ((el = document.getElementById('mRandom'))) el.onclick = startRandom;
-    if ((el = document.getElementById('mReview'))) el.onclick = startReview;
-    if ((el = document.getElementById('mMock'))) el.onclick = showMockMenu;
-    if ((el = document.getElementById('mStats'))) el.onclick = showStats;
+    if ((el = document.getElementById('mRandom'))) el.onclick = function () { startRandom(ch); };
+    if ((el = document.getElementById('mReview'))) el.onclick = function () { startReview(ch); };
+    if ((el = document.getElementById('mMock'))) el.onclick = function () { showMockMenu(ch); };
+    if ((el = document.getElementById('mStats'))) el.onclick = function () { showStats(); };
     if ((el = document.getElementById('introOk'))) el.onclick = function () { S.seenIntro = true; save(); showHome(); };
     if ((el = document.getElementById('sndBtn'))) el.onclick = function () { S.sound = !S.sound; save(); el.textContent = S.sound ? '🔊' : '🔇'; beep(SFX.ok); };
   }
 
+  /* ================= 第0章: 試験ガイド ================= */
+  function showGuide() {
+    stopTimer(); B = null;
+    var h = heroHTML() + tabsHTML(0);
+    h += '<div class="card chhead"><b style="font-size:1.1rem">🧭 第0章　試験ガイド</b>' +
+      '<div class="muted small" style="margin-top:4px">問題に取りかかる前の「地図」です。全部で数分。読み終えたら「読んだ」にチェックしておくと、進み具合が分かります。<br>' +
+      '<b>これを読まずに問題へ進んでも大丈夫</b>ですが、解き方の型とひっかけのパターンは、早めに知っておくと得点が安定します。</div></div>';
+    GUIDE.forEach(function (g) {
+      h += '<div class="card guide"><h3>' + esc(g.title) + '</h3>';
+      if (g.type === 'map') {
+        TOPICS.forEach(function (t) {
+          h += '<div class="gmap"><b>' + t.icon + ' 主題' + t.id + '　' + esc(t.full) + '</b><ul>' +
+            t.subs.map(function (s) { return '<li><span class="id">' + s.id + '</span> ' + esc(s.name) + ' <span class="star-w">' + stars(s.w) + '</span></li>'; }).join('') + '</ul></div>';
+        });
+        h += '<div class="muted small">★が多いほど重要度が高い（LPI-Japan 公式の出題範囲に基づく）。</div>';
+      } else {
+        h += '<ul>' + g.bullets.map(function (b) { return '<li>' + fmt(b) + '</li>'; }).join('') + '</ul>';
+      }
+      h += '<label class="row small readchk"><input type="checkbox" data-read="' + g.id + '"' + (S.guideRead[g.id] ? ' checked' : '') + '> 読んだ</label></div>';
+    });
+    h += '<div class="row"><button class="btn primary big" data-ch="1">📘 第1章へ</button><button class="btn big" data-ch="2">⚔️ 第2章へ</button></div>';
+    view(h);
+    app.querySelectorAll('[data-ch]').forEach(function (b) { b.onclick = function () { S.chapter = +b.dataset.ch; save(); showHome(); }; });
+    app.querySelectorAll('[data-read]').forEach(function (b) {
+      b.onchange = function () { S.guideRead[b.dataset.read] = b.checked; save(); var t = app.querySelector('.tab.active i'); if (t) t.textContent = '読了 ' + GUIDE.filter(function (x) { return S.guideRead[x.id]; }).length + '/' + GUIDE.length; };
+    });
+    var el = document.getElementById('sndBtn');
+    if (el) el.onclick = function () { S.sound = !S.sound; save(); el.textContent = S.sound ? '🔊' : '🔇'; beep(SFX.ok); };
+  }
+
   /* ---- 要点メモ（モーダル） ---- */
-  function showMemo(subId, onClose, startLabel) {
+  function showMemo(subId, ch) {
     var s = subById[subId], items = MEMOS[subId] || [];
     var m = document.createElement('div');
     m.id = 'modal';
     m.innerHTML = '<div class="box"><h3>' + s.mon + ' ' + s.id + ' ' + esc(s.name) + '</h3>' +
       '<div class="muted small">要点メモ — 重要度 <span class="star-w">' + stars(s.w) + '</span>　（読まずに問題へ進んでもOK。解説で学べます）</div>' +
-      '<ul>' + items.map(function (x) { return '<li>' + fmt(x) + '</li>'; }).join('') + '</ul>' +
-      '<div class="row"><button class="btn primary" id="mmGo">' + (startLabel || '⚔️ このステージに挑戦') + '</button><button class="btn" id="mmClose">閉じる</button></div></div>';
+      '<ul>' + items.map(function (x) { return '<li>' + inline(x) + '</li>'; }).join('') + '</ul>' +
+      '<div class="row"><button class="btn primary" id="mmGo">⚔️ このステージに挑戦</button><button class="btn" id="mmClose">閉じる</button></div></div>';
     document.body.appendChild(m);
-    function close() { if (m.parentNode) m.parentNode.removeChild(m); document.removeEventListener('keydown', esc_); if (onClose) onClose(); }
-    function esc_(e) { if (e.key === 'Escape') close(); }
-    document.addEventListener('keydown', esc_);
+    function close() { if (m.parentNode) m.parentNode.removeChild(m); document.removeEventListener('keydown', onEsc); }
+    function onEsc(e) { if (e.key === 'Escape') close(); }
+    document.addEventListener('keydown', onEsc);
     m.onclick = function (e) { if (e.target === m) close(); };
     m.querySelector('#mmClose').onclick = close;
-    m.querySelector('#mmGo').onclick = function () { close(); startStage(subId); };
+    m.querySelector('#mmGo').onclick = function () { close(); startStage(subId, ch || curCh()); };
   }
 
   /* ================= バトル ================= */
   function newBattle(cfg) {
     stopTimer();
     B = {
-      mode: cfg.mode, title: cfg.title, subId: cfg.subId || null, queue: cfg.queue,
+      mode: cfg.mode, ch: cfg.ch, title: cfg.title, subId: cfg.subId || null, queue: cfg.queue,
       idx: 0, maxHp: maxHpOf(levelOf(S.exp)), hp: maxHpOf(levelOf(S.exp)), combo: 0, bestCombo: 0,
-      results: [], expGain: 0, levelUps: [], cur: null, answers: [], t0: Date.now(), cfg: cfg
+      results: [], expGain: 0, levelUps: [], cur: null, t0: Date.now()
     };
     showQuestion();
   }
 
-  function startStage(subId) {
-    var qs = subQs(subId);
+  function startStage(subId, ch) {
+    ch = ch || curCh();
+    var qs = subQs(subId, ch);
     if (!qs.length) { toast('このステージの問題はまだありません'); return; }
     var picks = weightedPick(qs, qWeight, Math.min(5, qs.length));
     var hi = picks.findIndex(function (q) { return q.hard; });
     if (hi >= 0 && hi !== picks.length - 1) { var b = picks.splice(hi, 1)[0]; picks.push(b); }
-    var queue = picks.map(function (q, i) { return { q: q, boss: picks.length >= 3 && i === picks.length - 1 }; });
+    var queue = picks.map(function (q, i) { return { q: inst(q), boss: picks.length >= 3 && i === picks.length - 1 }; });
     var s = subById[subId];
-    newBattle({ mode: 'stage', title: s.id + ' ' + s.name, subId: subId, queue: queue });
+    newBattle({ mode: 'stage', ch: ch, title: chById[ch].name + '　' + s.id + ' ' + s.name, subId: subId, queue: queue });
   }
-  function startRandom() {
-    var picks = weightedPick(BANK, function (q) { return qWeight(q) * q.sub.w; }, 10);
-    newBattle({ mode: 'random', title: '🎲 ランダム修行', queue: picks.map(function (q) { return { q: q }; }) });
+  function startRandom(ch) {
+    var picks = weightedPick(chQs(ch), function (q) { return qWeight(q) * q.sub.w; }, 10);
+    newBattle({ mode: 'random', ch: ch, title: '🎲 ランダム修行（' + chById[ch].name + '）', queue: picks.map(function (q) { return { q: inst(q) }; }) });
   }
-  function startReview() {
-    var pool = reviewPool();
+  function startReview(ch) {
+    var pool = reviewPool(ch);
     if (!pool.length) { toast('復習する問題はありません。いい調子！'); return; }
     var picks = weightedPick(pool, function (q) { return 5 - qBox(q); }, Math.min(10, pool.length));
-    newBattle({ mode: 'review', title: '📖 復習の洞窟', queue: picks.map(function (q) { return { q: q }; }) });
+    newBattle({ mode: 'review', ch: ch, title: '📖 復習の洞窟（' + chById[ch].name + '）', queue: picks.map(function (q) { return { q: inst(q) }; }) });
   }
 
   function currentMon(it) {
@@ -398,10 +498,10 @@
     }
 
     h += '<div class="card qcard"><div class="qmeta">' +
-      '<span class="pill">' + q.t + '</span><span class="pill type">' + typeLabel(q) + '</span>' +
+      '<span class="pill">' + chById[q.ch].name + '</span><span class="pill">' + q.t + '</span><span class="pill type">' + typeLabel(q) + '</span>' +
       (it.revenge ? '<span class="pill revenge">🔁 リベンジ</span>' : '') +
       (it.boss ? '<span class="pill revenge">👑 ボス問題</span>' : '') +
-      (q.custom ? '<span class="pill">✏️ 自作</span>' : '') +
+      (q.base ? '<span class="pill">🎲 毎回変わる</span>' : '') +
       '</div><div class="qtext">' + fmt(q.q) + '</div><div id="ansArea">';
 
     if (q.type === 'input') {
@@ -409,7 +509,7 @@
         '<button class="btn primary" id="submit">' + (mock ? '決定' : '実行') + '</button></div><div class="hintline" id="hintline"></div>';
     } else {
       h += '<div class="opts">' + v.opts.map(function (o, n) {
-        return '<button class="opt" data-i="' + o.i + '"><span class="k">' + (n + 1) + '</span><span>' + fmt(o.text) + '</span></button>';
+        return '<button class="opt" data-i="' + o.i + '"><span class="k">' + (n + 1) + '</span><span>' + inline(o.text) + '</span></button>';
       }).join('') + '</div>';
       if (q.type === 'multi' || mock) h += '<div class="row" style="margin-top:10px"><button class="btn primary" id="submit">' + (mock ? '決定して次へ' : '回答する') + '</button></div>';
     }
@@ -529,7 +629,7 @@
     } else {
       B.combo = 0; dmg = boss ? 30 : 20;
       B.hp = Math.max(0, B.hp - dmg);
-      if (!it.revenge) B.queue.push({ q: q, revenge: true });
+      if (!it.revenge) B.queue.push({ q: inst(q.base || q), revenge: true });
       beep(SFX.ng); anim('hero', 'shake'); floatText('-' + dmg, 'dmg');
     }
     save();
@@ -538,7 +638,7 @@
     showFeedback(ok, gain, up, drop);
   }
 
-  function lockOptions(v, q) {
+  function lockOptions(v) {
     app.querySelectorAll('.opt').forEach(function (b) {
       var i = +b.dataset.i; var o = v.opts.find(function (x) { return x.i === i; });
       b.disabled = true; b.classList.remove('sel');
@@ -551,7 +651,7 @@
 
   function showFeedback(ok, gain, up, drop) {
     var c = B.cur, q = c.q, v = c.v;
-    lockOptions(v, q);
+    lockOptions(v);
     var last = (B.idx >= B.queue.length - 1) || B.hp <= 0;
     var h = '<div class="fb ' + (ok ? 'ok' : 'ng') + '"><div class="fbhead">' +
       (ok ? '⭕ 正解！ +' + gain + ' EXP' : '❌ 不正解…' + (c.it.revenge ? '' : ' あとでもう一度出るよ')) + '</div>' +
@@ -574,23 +674,29 @@
   }
 
   /* ---- 模擬試験 ---- */
-  function showMockMenu() {
-    var total = BANK.length;
-    var h = '<div class="card"><h2>👹 魔王城（模擬試験）</h2>' +
+  function showMockMenu(ch) {
+    var total = chQs(ch).length, c = chById[ch];
+    var sizes = [20, 40, 60].filter(function (n) { return n <= total; });
+    var fs = firstStats(ch);
+    var h = '<div class="card"><h2>👹 魔王城（模擬試験）　' + c.icon + ' ' + c.name + '</h2>' +
       '<p>HPや敵演出なしの本番形式。<b>回答中は正誤を表示しません</b>。終了後に採点・分野別の結果・解説を表示します。</p>' +
-      '<p class="muted small">出題は小主題の重要度に応じた配分。本番は60問・90分・500/800点が合格目安です。</p>' +
-      '<div class="row"><button class="btn big" data-n="20">ミニ（20問）</button><button class="btn big" data-n="40">標準（40問）</button>' +
-      '<button class="btn big primary" data-n="60">本番形式（60問）</button></div>' +
-      '<p class="muted small">問題数 ' + total + '問から選ばれます。</p>' +
+      '<p class="muted small">出題は小主題の重要度に応じた配分で、<b>まだ解いていない問題を優先</b>します。本番は60問・90分・500/800点が合格目安です。' +
+      (ch === 1 ? '<br>※ 第1章は同じ問題を何度も解いていると、答えを覚えている分、点数が高く出ます。実力測定には第2章を使ってください。' : '') + '</p>' +
+      '<div class="row">' + sizes.map(function (n) { return '<button class="btn big' + (n === 60 ? ' primary' : '') + '" data-n="' + n + '">' + (n === 60 ? '本番形式（60問）' : n === 40 ? '標準（40問）' : 'ミニ（20問）') + '</button>'; }).join('') + '</div>' +
+      '<p class="muted small">' + c.name + 'の問題数：' + total + '問　／　これまでの初見正答率：' + (fs.n ? pct(fs.rate) + '%（' + fs.ok + '/' + fs.n + '）' : '—') + '</p>' +
       '<button class="btn" id="back">← ホームへ</button></div>';
     view(h);
-    app.querySelectorAll('[data-n]').forEach(function (b) { b.onclick = function () { startMock(+b.dataset.n); }; });
+    app.querySelectorAll('[data-n]').forEach(function (b) { b.onclick = function () { startMock(+b.dataset.n, ch); }; });
     document.getElementById('back').onclick = showHome;
   }
 
-  function startMock(n) {
-    n = Math.min(n, BANK.length);
-    var bySub = {}; SUBS.forEach(function (s) { bySub[s.id] = shuffle(subQs(s.id)); });
+  function startMock(n, ch) {
+    n = Math.min(n, chQs(ch).length);
+    var bySub = {};
+    SUBS.forEach(function (s) {
+      // 解いた回数が少ない問題を末尾に並べて pop で取り出す（未回答を優先）
+      bySub[s.id] = shuffle(subQs(s.id, ch)).sort(function (a, b) { return seenOf(b) - seenOf(a); });
+    });
     var picked = [], guard = 0;
     while (picked.length < n && guard++ < 5000) {
       var cand = SUBS.filter(function (s) { return bySub[s.id].length; });
@@ -598,7 +704,7 @@
       var s = weightedPick(cand, function (x) { return x.w; }, 1)[0];
       picked.push(bySub[s.id].pop());
     }
-    newBattle({ mode: 'mock', title: '👹 模擬試験 ' + picked.length + '問', queue: shuffle(picked).map(function (q) { return { q: q }; }) });
+    newBattle({ mode: 'mock', ch: ch, title: '👹 模擬試験 ' + chById[ch].name + '（' + picked.length + '問）', queue: shuffle(picked).map(function (q) { return { q: inst(q) }; }) });
   }
 
   function mockNext() {
@@ -611,21 +717,26 @@
 
   function finishMock() {
     stopTimer();
+    var ch = B.ch;
     var total = B.results.length, right = B.results.filter(function (r) { return r.ok; }).length;
     var score = Math.round(right / total * 800), pass = right / total >= PASS_RATE;
+    // 初見の正誤を集計（記録前に判定）
+    var firstN = 0, firstOk = 0;
+    B.results.forEach(function (r) { if (!S.q[r.q.id] || !S.q[r.q.id].seen) { firstN++; if (r.ok) firstOk++; } });
     B.results.forEach(function (r) { recordAnswer(r.q, r.ok); });
     var gain = right * 3; var up = addExp(gain);
-    S.mocks.push({ date: today(), total: total, right: right, score: score });
-    if (S.mocks.length > 20) S.mocks = S.mocks.slice(-20);
+    S.mocks.push({ date: today(), ch: ch, total: total, right: right, score: score });
+    if (S.mocks.length > 30) S.mocks = S.mocks.slice(-30);
     save();
     var per = {};
     B.results.forEach(function (r) {
       var a = r.q.sub.area.id; per[a] = per[a] || { n: 0, ok: 0 }; per[a].n++; if (r.ok) per[a].ok++;
     });
-    var h = '<div class="card result center"><div class="muted">模擬試験の結果</div>' +
+    var h = '<div class="card result center"><div class="muted">模擬試験の結果（' + chById[ch].name + '）</div>' +
       '<div class="verdict ' + (pass ? 'pass' : 'fail') + '">' + (pass ? '合格ライン到達！' : 'あと少し…') + '</div>' +
       '<div style="font-size:1.6rem;font-weight:800">' + score + ' <span class="muted" style="font-size:1rem">/ 800点（' + right + '/' + total + '問正解・' + pct(right / total) + '%）</span></div>' +
       '<div class="muted small">所要時間 ' + mmss(Date.now() - B.t0) + ' ／ 合格目安 500点（約62.5%）</div>' +
+      (firstN ? '<div class="small" style="margin-top:6px">うち<b>初見の問題</b>の正答率：<b>' + pct(firstOk / firstN) + '%</b>（' + firstOk + '/' + firstN + '）<br><span class="muted">既に解いた問題が多いと、実力より高く出ます。初見が少ないときは参考程度に。</span></div>' : '<div class="muted small" style="margin-top:6px">すべて既に解いたことのある問題でした（実力より高く出ている可能性があります）。</div>') +
       '<div style="margin-top:8px">獲得 EXP +' + gain + (up ? '　🎉 レベルアップ！ Lv.' + up.level : '') + '</div></div>';
     h += '<div class="card"><b>分野別</b><table class="tbl" style="margin-top:6px"><tr><th>主題</th><th>正答</th><th style="width:40%">正答率</th></tr>';
     TOPICS.forEach(function (t) {
@@ -638,8 +749,8 @@
     h += '<div class="row"><button class="btn primary" id="again">もう一度挑戦</button><button class="btn" id="review">📖 復習の洞窟へ</button><button class="btn" id="home">ホームへ</button></div>';
     view(h);
     beep(pass ? SFX.clear : SFX.ng);
-    document.getElementById('again').onclick = showMockMenu;
-    document.getElementById('review').onclick = startReview;
+    document.getElementById('again').onclick = function () { showMockMenu(ch); };
+    document.getElementById('review').onclick = function () { startReview(ch); };
     document.getElementById('home').onclick = showHome;
   }
 
@@ -663,7 +774,8 @@
     if (!defeated && B.mode === 'stage') {
       var rt = total ? right / total : 0;
       star = rt >= 1 ? 3 : (rt >= 0.8 ? 2 : (rt >= 0.6 ? 1 : 0));
-      if (star > (S.clears[B.subId] || 0)) S.clears[B.subId] = star;
+      var key = clearKey(B.subId, B.ch);
+      if (star > (S.clears[key] || 0)) S.clears[key] = star;
     }
     save();
     var h = '<div class="card result center"><h2>' + (defeated ? '💀 力尽きた…' : '🏆 ' + (B.mode === 'stage' ? 'ステージクリア！' : 'お疲れさま！')) + '</h2>';
@@ -681,13 +793,13 @@
     h += '<div class="row"><button class="btn primary big" id="retry">⚔️ もう一度</button>' +
       (B.mode === 'stage' ? '<button class="btn" id="memo">📘 要点メモ</button>' : '') +
       '<button class="btn" id="home">ホームへ</button></div>';
-    var mode = B.mode, subId = B.subId;
+    var mode = B.mode, subId = B.subId, ch = B.ch;
     view(h);
     beep(defeated ? SFX.ng : SFX.clear);
     document.getElementById('retry').onclick = function () {
-      if (mode === 'stage') startStage(subId); else if (mode === 'random') startRandom(); else startReview();
+      if (mode === 'stage') startStage(subId, ch); else if (mode === 'random') startRandom(ch); else startReview(ch);
     };
-    var m = document.getElementById('memo'); if (m) m.onclick = function () { showMemo(subId); };
+    var m = document.getElementById('memo'); if (m) m.onclick = function () { showMemo(subId, ch); };
     document.getElementById('home').onclick = showHome;
   }
 
@@ -698,27 +810,34 @@
     var h = '<div class="row between" style="margin-bottom:10px"><h2>📊 戦績・設定</h2><button class="btn" id="home">← ホームへ</button></div>';
     h += '<div class="card"><div class="stat-chips" style="margin:0">' +
       '<span class="chip">総回答 <b>' + st.answered + '</b></span><span class="chip">正答率 <b>' + pct(acc) + '%</b></span>' +
-      '<span class="chip">最大コンボ <b>' + st.bestCombo + '</b></span><span class="chip">総合習熟度 <b>' + pct(overall()) + '%</b></span>' +
-      '<span class="chip">問題数 <b>' + BANK.length + '</b></span></div></div>';
+      '<span class="chip">最大コンボ <b>' + st.bestCombo + '</b></span></div></div>';
 
-    h += '<div class="card"><b>小主題ごとの習熟度</b><table class="tbl" style="margin-top:6px"><tr><th>小主題</th><th>重要度</th><th>習熟</th><th>★</th></tr>';
-    SUBS.forEach(function (s) {
-      var m = mastery(s.id), c = S.clears[s.id] || 0;
-      h += '<tr><td><span class="muted">' + s.id + '</span> ' + esc(s.name) + '</td><td class="star-w">' + stars(s.w) + '</td>' +
-        '<td style="min-width:110px"><div class="bar mastery"><i style="width:' + pct(m) + '%"></i></div><span class="muted small">' + pct(m) + '%</span></td>' +
-        '<td class="stars">' + '★'.repeat(c) + '</td></tr>';
+    chapterList().filter(function (c) { return c.id > 0; }).forEach(function (c) {
+      var fs = firstStats(c.id);
+      h += '<div class="card"><b>' + c.icon + ' ' + c.name + '　' + esc(c.sub) + '</b>' +
+        '<div class="stat-chips"><span class="chip">習熟度 <b>' + pct(overall(c.id)) + '%</b></span>' +
+        '<span class="chip">初見正答率 <b>' + (fs.n ? pct(fs.rate) + '%' : '—') + '</b>' + (fs.n ? '（' + fs.ok + '/' + fs.n + '）' : '') + '</span>' +
+        '<span class="chip">問題数 <b>' + chQs(c.id).length + '</b></span></div>' +
+        '<table class="tbl" style="margin-top:6px"><tr><th>小主題</th><th>重要度</th><th>習熟</th><th>★</th></tr>';
+      SUBS.forEach(function (s) {
+        if (!subQs(s.id, c.id).length) return;
+        var m = mastery(s.id, c.id), cl = S.clears[clearKey(s.id, c.id)] || 0;
+        h += '<tr><td><span class="muted">' + s.id + '</span> ' + esc(s.name) + '</td><td class="star-w">' + stars(s.w) + '</td>' +
+          '<td style="min-width:110px"><div class="bar mastery"><i style="width:' + pct(m) + '%"></i></div><span class="muted small">' + pct(m) + '%</span></td>' +
+          '<td class="stars">' + '★'.repeat(cl) + '</td></tr>';
+      });
+      h += '</table></div>';
     });
-    h += '</table></div>';
 
     if (S.mocks.length) {
-      h += '<div class="card"><b>模擬試験の履歴</b><table class="tbl" style="margin-top:6px"><tr><th>日付</th><th>正解</th><th>得点</th></tr>' +
-        S.mocks.slice().reverse().slice(0, 10).map(function (m) {
-          return '<tr><td>' + m.date + '</td><td>' + m.right + '/' + m.total + '</td><td>' + m.score + ' / 800 ' + (m.score >= 500 ? '✅' : '') + '</td></tr>';
+      h += '<div class="card"><b>模擬試験の履歴</b><table class="tbl" style="margin-top:6px"><tr><th>日付</th><th>章</th><th>正解</th><th>得点</th></tr>' +
+        S.mocks.slice().reverse().slice(0, 12).map(function (m) {
+          return '<tr><td>' + m.date + '</td><td>' + chById[m.ch || 1].name + '</td><td>' + m.right + '/' + m.total + '</td><td>' + m.score + ' / 800 ' + (m.score >= 500 ? '✅' : '') + '</td></tr>';
         }).join('') + '</table></div>';
     }
 
     // 自作問題
-    h += '<div class="card"><b>✏️ 自作問題を追加</b><div class="muted small">他の問題集や学習中に間違えた論点を、自分の言葉でメモしてゲームに追加できます（このブラウザに保存）。<br>誤答欄を空にすると「コマンド入力問題」になります。</div>' +
+    h += '<div class="card"><b>✏️ 自作問題を追加</b><div class="muted small">他の問題集や学習中に間違えた論点を、自分の言葉でメモしてゲームに追加できます（このブラウザに保存。「自作ノート」として他の章とは別に扱われます）。<br>誤答欄を空にすると「コマンド入力問題」になります。</div>' +
       '<label class="f">小主題</label><select class="f-in" id="cSub">' + SUBS.map(function (s) { return '<option value="' + s.id + '">' + s.id + ' ' + esc(s.name) + '</option>'; }).join('') + '</select>' +
       '<label class="f">問題文（`バッククォート` でコード表示）</label><textarea class="f-in" id="cQ"></textarea>' +
       '<label class="f">正解（コマンド入力問題の場合は入力するコマンド）</label><input class="f-in" id="cA">' +
@@ -779,11 +898,11 @@
     var q = val('cQ'), a = val('cA');
     if (!q || !a) { toast('問題文と正解は必須です'); return; }
     var wr = [val('cW1'), val('cW2'), val('cW3')].filter(Boolean);
-    var obj = { id: 'c-' + Date.now().toString(36), t: val('cSub') || document.getElementById('cSub').value, q: q, e: val('cE'), hard: false, custom: true };
+    var obj = { id: 'c-' + Date.now().toString(36), t: document.getElementById('cSub').value, q: q, e: val('cE'), hard: false, custom: true };
     if (wr.length === 0) { obj.type = 'input'; obj.ans = [a]; }
     else if (wr.length === 3) { obj.type = 'choice'; obj.o = [a].concat(wr); obj.a = 0; }
     else { toast('誤答は3つ入力するか、すべて空にしてください'); return; }
-    S.custom.push(obj); save(); buildBank(); toast('追加しました'); showStats();
+    S.custom.push(obj); save(); buildBank(); toast('追加しました（自作ノートの章に入ります）'); showStats();
   }
 
   /* ================= キーボード操作 ================= */
@@ -798,7 +917,7 @@
       e.preventDefault(); B.mode === 'mock' ? mockNext() : commit(); return;
     }
     if (typing) return;
-    if (/^[1-4]$/.test(e.key)) {
+    if (/^[1-9]$/.test(e.key)) {
       var o = app.querySelectorAll('.opt')[+e.key - 1];
       if (o && !o.classList.contains('gone')) o.click();
     } else if (e.key === 'Enter') {
