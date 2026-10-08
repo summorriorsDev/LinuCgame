@@ -402,6 +402,13 @@
             t.subs.map(function (s) { return '<li><span class="id">' + s.id + '</span> ' + esc(s.name) + ' <span class="star-w">' + stars(s.w) + '</span></li>'; }).join('') + '</ul></div>';
         });
         h += '<div class="muted small">★が多いほど重要度が高い（LPI-Japan 公式の出題範囲に基づく）。</div>';
+      } else if (g.type === 'cheat') {
+        h += '<div class="muted small" style="margin-bottom:8px">' + inline(g.note) + '</div>';
+        g.groups.forEach(function (gr) {
+          var s = subById[gr.sub];
+          h += '<div class="gmap"><b><span class="id">' + s.id + '</span> ' + s.mon + ' ' + esc(s.name) + ' <span class="star-w">' + stars(s.w) + '</span></b><ul>' +
+            gr.items.map(function (it) { return '<li>' + inline(it) + '</li>'; }).join('') + '</ul></div>';
+        });
       } else {
         h += '<ul>' + g.bullets.map(function (b) { return '<li>' + fmt(b) + '</li>'; }).join('') + '</ul>';
       }

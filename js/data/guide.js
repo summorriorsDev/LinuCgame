@@ -1,6 +1,107 @@
 /* 第0章 試験ガイド — 読み物。type:'map' は出題範囲マップ（TOPICS から自動生成）。 */
 window.GUIDE = [
   {
+    id: 'cheat', type: 'cheat', title: '⚡ 直前まとめ（第2章で間違えやすかったところ＋頻出）',
+    note: '各小主題の「ここだけは」を1か所に集めたもの。重要度の高い順（★4→）に並べてある。**読むだけで復習になる**ので、問題を解く前後に流し読みする。',
+    groups: [
+      { sub: '1.01.1', items: [
+        'パッケージ形式：Debian・Ubuntu = **.deb**（apt / dpkg）、RHEL・AlmaLinux・Rocky・CentOS = **.rpm**（dnf / yum / rpm）。',
+        '公開鍵認証：サーバの `~/.ssh/authorized_keys` に登録するのは**公開鍵**（秘密鍵は渡さない）。ホスト鍵の警告は `ssh-keygen -R ホスト名` で known_hosts の記録を消す。',
+        '再起動 `systemctl reboot` / `shutdown -r now`、停止 `shutdown -h now`、取り消し `shutdown -c`。`+5` は5分後。',
+        'ポート指定は ssh が小文字 `-p`、scp が大文字 `-P`。サーバ設定は `sshd_config`（クライアントは `ssh_config`）。'
+      ] },
+      { sub: '1.01.2', items: [
+        'KVM に必要な CPU 機能は **Intel VT-x / AMD-V**。コンテナは**カーネルを共有**、VMはゲストごとにカーネルを持つ。',
+        'Dockerfile：`FROM`=ベースイメージ、`RUN`=**ビルド時**に実行、`COPY`、`EXPOSE`、`CMD`=**起動時**の既定コマンド。',
+        '`docker run`：`-d` バックグラウンド、`--name` 名前、`-e` 環境変数、`-p ホスト:コンテナ`、`-v` ボリューム、`--rm` 終了時に削除、`-it` 対話。',
+        '`docker ps -a`（停止中も）、`docker exec -it 名前 bash`、コンテナ削除 `rm`・イメージ削除 `rmi`。`Exited (0)` は正常終了。'
+      ] },
+      { sub: '1.01.3', items: [
+        '`enable`=自動起動の設定（**起動はしない**）、`start`=今すぐ起動、`enable --now`=両方。`is-enabled`（自動起動か）と `is-active`（今動いているか）は別。',
+        'ユニットの `[Install]` の `WantedBy=` に従って `.wants` へリンクが作られる。`After=` は**順序**だけ（依存の要求ではない）。',
+        '`systemctl --failed` で失敗ユニット。`status` の `Loaded: ... disabled` は自動起動が無効。',
+        'UEFI のブートローダは **ESP（EFI システムパーティション）** に置く。ターゲット：runlevel 3=`multi-user`、5=`graphical`、1=`rescue`。GRUB画面での `systemd.unit=` 指定は**その1回だけ**有効。',
+        '`journalctl`：`-u ユニット`、`-b`（今回の起動）、`-f`（追尾）、`-k`（カーネル）、`--since`。'
+      ] },
+      { sub: '1.03.1', items: [
+        '`sudo !!` で直前のコマンドを sudo 付きで再実行。`export` していない変数は**子プロセスに渡らない**。カレントのスクリプトは `./run.sh`（PATHにカレントはない）。',
+        '`A && B || C` は**左から**評価。`&&`=直前が成功のとき、`||`=直前が失敗のとき。',
+        '`man -k`（= apropos）でキーワード検索。`~ユーザ名` はそのユーザのホーム。ダブルクォートは変数展開あり、シングルは展開なし。'
+      ] },
+      { sub: '1.03.3', items: [
+        '`sudo echo x > /etc/file` が失敗するのは、**リダイレクトは sudo ではなく元のシェルが処理する**から。回避は `echo x | sudo tee /etc/file`。',
+        '`cmd > f 2>&1` は**両方**ファイルへ。`cmd 2>&1 > f` は順序が逆で、エラーは**画面**に出る。両方捨てる `> /dev/null 2>&1`。',
+        '`<<\'EOF\'`（クォート付き）のヒアドキュメントは変数展開されない。`xargs -n 1` は引数を1つずつ。`2>` はエラーだけ。`>` 上書き、`>>` 追記。',
+        'パイプで渡るのは**標準出力だけ**。`tee` は画面とファイルの両方へ。'
+      ] },
+      { sub: '1.05.2', items: [
+        'GPT を扱うのは **gdisk / parted**。MBR は基本パーティション最大4、**論理は5番から**、約2TBまで。',
+        'スワップ：`mkswap` → `swapon`（恒久化は `/etc/fstab`）。LVM：`pvcreate` → `vgcreate` → `lvcreate`。拡張は `lvextend` → `resize2fs`（ext）/ `xfs_growfs`（XFS）。',
+        '確認：`lsblk`（ツリー）、`blkid`（UUID）、`df -h`（空き）、`du -sh`（使用量）。RAID 1=ミラー、0=ストライプ、5=パリティ。'
+      ] },
+      { sub: '1.05.3', items: [
+        '`umount -l`（遅延アンマウント）。使用中のプロセスは `fuser -m` / `lsof`。マウント中は、そのディレクトリの**元のファイルは隠れる**（消えない）。',
+        '`e2fsck -f デバイス`（強制検査、アンマウントして実行）。XFS は `xfs_repair`・`xfs_growfs`。',
+        '`mount` の表示：`デバイス on マウントポイント type 種別 (オプション)`。`fstab` は6列：デバイス・マウントポイント・種別・オプション・dump・fsck順。`nofail`=無くても起動を続行。'
+      ] },
+      { sub: '1.01.4', items: [
+        '`ps -ef` の列は UID・PID・**PPID**（親）・C・STIME・TTY・TIME・CMD。',
+        'Ctrl+C=SIGINT、**Ctrl+Z=SIGTSTP**（≠SIGSTOP）、Ctrl+\\=SIGQUIT。`kill` 既定=SIGTERM(15)、`-9`=KILL、`-1`=HUP。',
+        'ssh 切断後も継続させる：`nohup コマンド &`、**tmux / screen**。nice は **-20〜19、小さいほど優先**、一般ユーザは上げる（優先度を下げる）のみ。',
+        '`top` の load average は **1・5・15分**。STAT の `Z`=ゾンビ。'
+      ] },
+      { sub: '1.02.1', items: [
+        '`chgrp グループ ファイル` / `chown :グループ ファイル`、`chown -R` は再帰。`4755`=SUID（`rws`）、`2755`=SGID、`1777`=スティッキー。',
+        'umask は 666（ファイル）/ 777（ディレクトリ）から**ビットを取り除く**。判定は「所有者→グループ→その他」の**最初に当てはまる区分だけ**を見る。',
+        'ディレクトリに `w` が無いと、中のファイルの作成・削除・名前変更ができない（`x` は移動・アクセス、`r` は一覧）。'
+      ] },
+      { sub: '1.02.2', items: [
+        '`ls` は **.で始まる隠しファイルを表示しない**（`-a` で表示）。`cp -r src dst` は dst が**既存ディレクトリ**なら `dst/src/` の中に入る。',
+        '`cp`・`mv` は既定で**確認なしに上書き**（`-i` で確認）。`gzip -k` は元ファイルを残す。`rm -- -f` / `rm ./-f`。',
+        'tar：`c` 作成・`x` 展開・`t` 一覧、`z` gzip・`j` bzip2・`J` xz、`f` の直後にファイル名。ブレース展開 `file{1..3}.txt`。'
+      ] },
+      { sub: '1.03.2', items: [
+        '**`tail -n +3` は3行目から最後まで**。`seq 1 15 | head -n 10 | tail -n 4` は 7〜10（先頭10行のうち最後の4行）。',
+        '`wc` は 行・単語・バイト。`sort -k2 -n`（2番目のフィールドを数値で）。`uniq` は**隣り合う**重複だけ（先に sort）、`-c` で件数。`cat -A` で行末 `$` とタブ `^I`。'
+      ] },
+      { sub: '1.04.1', items: [
+        '`apt update`（一覧の更新）→ `apt upgrade`（実際の更新）。`apt list --upgradable`。`apt-mark hold` で更新を固定。',
+        '`apt install ./foo.deb` は**依存関係を解決**、`dpkg -i` は解決しない。`remove` は設定を残し、`purge` は設定も削除。'
+      ] },
+      { sub: '1.04.3', items: [
+        '`yum group install`（まとめて導入）、`yum install ./foo.rpm` は**依存解決あり**（`rpm -ivh` はなし）。`yum makecache`=キャッシュ**作成**、`yum clean all`=**削除**。`enabled=0` は無効なリポジトリ。'
+      ] },
+      { sub: '1.05.1', items: [
+        '`lsmod` の `Used by` = そのモジュールを使っている**他のモジュール**。`lspci -k` の `Kernel driver in use` = 現在使用中のドライバ。',
+        '自動ロードを止める：`/etc/modprobe.d/*.conf` に `blacklist モジュール名`。起動時に読み込む：`/etc/modules-load.d/*.conf`。`udevadm monitor`、CPU数は `nproc` / `/proc/cpuinfo`。'
+      ] },
+      { sub: '1.03.5', items: [
+        '**`.`=直前の変更操作を繰り返す**（検索の繰り返しは `n`）。`:%s/foo/bar/gc` の **c=確認**。`:10,20d` で10〜20行目を削除。',
+        '保存して終了は **`:wq` / `ZZ` / `:x`**。`p`=下に貼り付け、`P`=上に貼り付け。'
+      ] },
+      { sub: '1.02.3', items: [
+        'ハードリンク：同じ inode・同一FS内・ディレクトリ不可で、**リンク数が増える**。`ln -s` はリンク数に**影響しない**。`rm` で名前を消すと減る（0になるまでデータは残る）。',
+        'シンボリックリンクは別FSにも張れる。**相対パスは「リンクが置かれた場所」基準**。元を消すと壊れる。'
+      ] },
+      { sub: '1.02.4', items: [
+        '**`/var/tmp` は再起動後も保持**、`/tmp` は消えてよい、`/run` は起動のたびに作り直し。独自導入したコマンドは **`/usr/local/bin`**。',
+        '`find`：`-size +100M`、`-mtime +7`（7日より前）、`-mmin -10`（10分以内）、`-iname`（大小無視）、`-perm -4000`。`type` は alias・組み込み・外部を判別。'
+      ] },
+      { sub: '1.04.4', items: [
+        '`rpm -q パッケージ`（導入済みか）、`rpm -V`（出力なし=異常なし。`S`サイズ・`5`MD5・`T`時刻が変化、`c`=設定ファイル）。`-U` は未導入でも導入、`-F` は**導入済みのみ**更新。'
+      ] },
+      { sub: '1.04.2', items: [
+        '`dpkg -L`=ファイル一覧、`-S`=ファイルから所属パッケージ、`-l`=状態一覧、`-P`=設定も削除。状態 `rc` は削除済みだが設定が残っている。`dpkg-reconfigure` は設定をやり直す。'
+      ] },
+      { sub: '1.01.5', items: [
+        '`DISPLAY=:0` はローカルの最初のディスプレイ。GNOME=デスクトップ環境、GDM=ディスプレイマネージャ。`ssh -X` でX転送、Wayland は X11 の後継。'
+      ] },
+      { sub: '1.03.4', items: [
+        '`grep` の終了ステータス：一致あり=0、**一致なし=1**。`.`=任意の1文字、`*`=直前の0回以上。`sed s/a/b/` は各行の最初の1つ、`/g` で全部。基本正規表現の `+` は `\\+`（`-E` なら `+`）。'
+      ] }
+    ]
+  },
+  {
     id: 'overview', title: 'LinuC と 101 試験のあらまし',
     bullets: [
       'LinuC は LPI-Japan が運営する Linux 技術者認定。レベル1の認定には、**101 試験と 102 試験の両方**に合格する必要がある（このゲームは 101 のみ対象）。',
