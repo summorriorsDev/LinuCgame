@@ -31,7 +31,7 @@
       items: { hint: 3, potion: 1 },
       stats: { answered: 0, correct: 0, bestCombo: 0, days: {} },
       q: {}, clears: {}, mocks: [], custom: [], sound: true, seenIntro: false,
-      exportedFp: '', exportReminder: true, chapter: 1, guideRead: {}
+      exportedFp: '', exportReminder: true, chapter: 1, guideRead: {}, dojo: {}
     };
   }
   function load() {
@@ -56,7 +56,7 @@
   /* ---- 書き出し忘れ防止 ----
      進捗の指紋（回答数・EXP・自作問題数・模擬試験数）が、最後に書き出した時点と違えば「未書き出し」。 */
   var barDismissedFp = null;
-  function fp() { return [S.stats.answered, S.exp, S.custom.length, S.mocks.length].join(':'); }
+  function fp() { return [S.stats.answered, S.exp, S.custom.length, S.mocks.length, Object.keys(S.dojo || {}).length].join(':'); }
   function isDirty() { return S.exportReminder && S.stats.answered > 0 && fp() !== S.exportedFp; }
   function updateSaveBar() {
     var bar = document.getElementById('savebar');
@@ -281,6 +281,7 @@
   function tabsHTML(cur) {
     return '<div class="tabs" role="tablist">' + chapterList().map(function (c) {
       var sub = c.id === 0 ? ('読了 ' + GUIDE.filter(function (g) { return S.guideRead[g.id]; }).length + '/' + GUIDE.length)
+        : c.id === 4 ? window.DOJO.progressText()
         : ('習熟 ' + pct(overall(c.id)) + '%');
       return '<button class="tab' + (c.id === cur ? ' active' : '') + '" role="tab" data-ch="' + c.id + '">' +
         '<span>' + c.icon + ' ' + c.name + '</span><small>' + esc(c.sub) + '</small><i>' + sub + '</i></button>';
@@ -306,6 +307,7 @@
     stopTimer(); B = null;
     var ch = curCh();
     if (ch === 0) { showGuide(); return; }
+    if (ch === 4) { window.DOJO.show(); return; }
     var c = chById[ch], rec = recommend(ch), rv = reviewPool(ch).length;
     var fs = firstStats(ch), ov = overall(ch), total = chQs(ch).length;
     var gens = chQs(ch).filter(function (q) { return q.type === 'gen'; }).length;
@@ -819,7 +821,7 @@
       '<span class="chip">総回答 <b>' + st.answered + '</b></span><span class="chip">正答率 <b>' + pct(acc) + '%</b></span>' +
       '<span class="chip">最大コンボ <b>' + st.bestCombo + '</b></span></div></div>';
 
-    chapterList().filter(function (c) { return c.id > 0; }).forEach(function (c) {
+    chapterList().filter(function (c) { return c.id > 0 && c.id !== 4; }).forEach(function (c) {
       var fs = firstStats(c.id);
       h += '<div class="card"><b>' + c.icon + ' ' + c.name + '　' + esc(c.sub) + '</b>' +
         '<div class="stat-chips"><span class="chip">習熟度 <b>' + pct(overall(c.id)) + '%</b></span>' +
@@ -938,6 +940,17 @@
     save();
     if (isDirty()) { e.preventDefault(); e.returnValue = ''; return ''; }
   });
+  // 道場（js/dojo.js）が使うゲーム側の API
+  window.GAME = {
+    S: function () { return S; }, save: save, view: view, esc: esc, inline: inline, fmt: fmt, toast: toast,
+    addExp: addExp, beep: beep, SFX: SFX, SUBS: SUBS, subById: subById, TOPICS: TOPICS, stars: stars,
+    heroHTML: heroHTML, tabsHTML: tabsHTML,
+    bindCommon: function () {
+      app.querySelectorAll('[data-ch]').forEach(function (b) { b.onclick = function () { S.chapter = +b.dataset.ch; save(); showHome(); }; });
+      var el = document.getElementById('sndBtn');
+      if (el) el.onclick = function () { S.sound = !S.sound; save(); el.textContent = S.sound ? '🔊' : '🔇'; beep(SFX.ok); };
+    }
+  };
   updateSaveBar();
   showHome();
 })();

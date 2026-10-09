@@ -68,7 +68,8 @@ window.CHAPTERS = [
   { id: 0, name: '第0章', sub: '試験ガイド', icon: '🧭' },
   { id: 1, name: '第1章', sub: '基礎固め（一問一答）', icon: '📘' },
   { id: 2, name: '第2章', sub: '実戦演習（試験形式・毎回変わる問題）', icon: '⚔️' },
-  { id: 3, name: '自作ノート', sub: '自分で追加した問題', icon: '✏️' }
+  { id: 3, name: '自作ノート', sub: '自分で追加した問題', icon: '✏️' },
+  { id: 4, name: '道場', sub: '実際に打って確かめる', icon: '🖥️' }
 ];
 (function () {
   function hash(s) {

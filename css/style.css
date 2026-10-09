@@ -248,6 +248,34 @@ pre.blk {
 }
 .miss pre.blk, .fb pre.blk { font-size: .82rem; }
 
+/* ---- ターミナル道場 ---- */
+.mission .goal { font-weight: 600; white-space: pre-wrap; margin-top: 4px; }
+.hintbox { margin-top: 10px; padding: 10px 12px; background: #3a2f0b; border: 1px solid var(--gold); border-radius: 8px; color: #ffe9a8; }
+.hintbox pre.blk { margin: 6px 0 0; }
+.term {
+  background: #05080f; border: 2px solid #2b3a6e; border-radius: 10px; margin: 12px 0; overflow: hidden;
+  font-family: var(--mono); font-size: 14px; line-height: 1.5; cursor: text;
+}
+.termout { height: 340px; overflow-y: auto; padding: 10px 12px 4px; white-space: pre-wrap; word-break: break-all; }
+.termout .tl { min-height: 1.5em; }
+.termout .tl.cmd { color: #e8ecf8; }
+.termout .tl.cmd .pr, .termin .pr { color: #4ade80; font-weight: 700; margin-right: 6px; }
+.termout .tl.out { color: #cfd8f6; }
+.termout .tl.err { color: #fca5a5; }
+.termout .tl.info { color: #8b97c4; font-style: italic; }
+.termin { display: flex; align-items: center; padding: 6px 12px 10px; border-top: 1px dashed #1f2a52; }
+.termin .pr { white-space: nowrap; }
+.termin input { flex: 1; min-width: 0; background: transparent; border: 0; outline: none; color: #d8ffe6; font: inherit; font-size: 16px; caret-color: #4ade80; }
+.term:focus-within { border-color: var(--green); }
+.dsub { border-top: 1px dashed #2b3a6e; padding: 10px 0 4px; }
+.dsub:first-of-type { border-top: 0; }
+.dsub .nm { font-weight: 700; margin-bottom: 6px; }
+.dsub .id { color: var(--sub); font-family: var(--mono); font-size: .8rem; margin-right: 6px; }
+.mrow { display: flex; gap: 8px; align-items: center; width: 100%; text-align: left; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin: 4px 0; min-height: 40px; }
+.mrow:hover { background: #2b3a6e; border-color: #5568b3; }
+.mrow.ok { border-color: #1f6b3a; background: #11331f; }
+.mrow .mk { flex: none; width: 1.4em; text-align: center; }
+
 /* ---- 書き出し忘れ防止バー ---- */
 #savebar {
   position: sticky; top: 0; z-index: 40;
