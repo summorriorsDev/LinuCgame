@@ -84,6 +84,8 @@ window.CHAPTERS = [
   }
   window.qc = function (t, q, o, a, e, hard) { add({ t: t, type: 'choice', q: q, o: o, a: a, e: e || '', hard: !!hard }); };
   window.qm = function (t, q, o, a, e, hard) { add({ t: t, type: 'multi', q: q, o: o, a: a, e: e || '', hard: !!hard }); };
+  /* qa … 「当てはまるものをすべて選べ」形式。正解の個数は表示しない（試験・Ping-t のように数が分からない） */
+  window.qa = function (t, q, o, a, e, hard) { add({ t: t, type: 'multi', hide: true, q: q, o: o, a: a, e: e || '', hard: !!hard }); };
   window.qi = function (t, q, ans, e, hard) { add({ t: t, type: 'input', q: q, ans: [].concat(ans), e: e || '', hard: !!hard }); };
   /* qg(小主題, キー, 生成関数, hard?) … 出題のたびに数値・文字列が変わる問題。
      生成関数は { type, q, o, a, e }（または ans）を返す。 */

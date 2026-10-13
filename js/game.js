@@ -261,7 +261,7 @@
     return '<code>' + esc(q.ans[0]) + '</code>' + (q.ans.length > 1 ? ' <span class="muted small">（他の書き方も正解になる場合があります）</span>' : '');
   }
   function typeLabel(q) {
-    if (q.type === 'multi') return q.a.length + '個選べ';
+    if (q.type === 'multi') return q.hide ? '複数選択（すべて選べ）' : q.a.length + '個選べ';
     if (q.type === 'input') return 'コマンド入力';
     return '単一選択';
   }
