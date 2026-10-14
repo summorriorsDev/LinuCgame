@@ -155,6 +155,55 @@ window.GUIDE = [
     ]
   },
   {
+    id: 'cheat3', type: 'cheat', title: '⚡ 追補2のまとめ（2回目の Ping-t で間違えた論点）',
+    note: '2回目の外部模擬で間違えた論点。**kill -9、cp -f、タブ↔空白、vi の基本、リダイレクト演算子**は、2回続けて間違えた論点なので、特に優先して覚える。',
+    groups: [
+      { sub: '1.01.4', items: [
+        '強制終了は **`-9` ＝ `-KILL` ＝ `-SIGKILL`**（複数選択では3つとも正解）。一時停止は SIGSTOP / `Ctrl+Z`、**再開は SIGCONT（`kill -CONT`）**。'
+      ] },
+      { sub: '1.01.3', items: [
+        '`systemctl restart`＝再起動（停止→起動）、`reload`＝設定の再読み込み、`daemon-reload`＝ユニットファイルの再読み込み。'
+      ] },
+      { sub: '1.01.1', items: [
+        'sshd のホスト鍵は **`/etc/ssh`**（`ssh_host_*_key`）。ユーザの鍵や `authorized_keys` は `~/.ssh`。'
+      ] },
+      { sub: '1.01.2', items: [
+        '`virsh list`＝起動中のみ、`virsh list --all`＝停止中も。'
+      ] },
+      { sub: '1.02.2', items: [
+        '`cp -f` ＝ 上書きできない既存のコピー先を**削除してから**コピー。`touch` ＝ 更新日時を現在にする（なければ空ファイルを作る）。',
+        '圧縮の文字：**`z`=gzip、`j`=bzip2、`J`=xz**。`tar cJf test.tar.xz test`。',
+        '**`expand`＝タブ→空白、`unexpand`＝空白→タブ**（`-a` で行頭以外も、`-t N` でタブ幅）。タブを空白1個に：`tr \'\\t\' \' \' < file`、`sed \'s/\\t/ /g\'`。',
+        'ページ単位で表示（編集不可）：**`less` / `more`**。`chmod -R 755 dir`、または `find dir -exec chmod 755 {} \\;`。'
+      ] },
+      { sub: '1.02.1', items: [
+        'ディレクトリ：`r`=一覧、`x`=移動・アクセス、**`w`=作成・削除（`x` も必要）**。`x` がないと中のファイルにアクセスできない。'
+      ] },
+      { sub: '1.02.4', items: [
+        '`locate`＝索引（`updatedb` で更新）で高速検索。`find` は実際に探索する。'
+      ] },
+      { sub: '1.03.1', items: [
+        '`history` の保存先は `~/.bash_history`。ホームの環境変数は `HOME`。**`unset 変数`** で変数を削除（`変数=` は空にするだけ）。',
+        '`whatis` の索引は `mandb`（古い環境は `makewhatis`）。`updatedb` は `locate` 用。'
+      ] },
+      { sub: '1.03.2', items: [
+        '`cut -d: -f1,7` ＝ 1番目と7番目。`-f1-7` は1〜7番目すべて。`od -b`（＝`-t o1`）は1バイトずつ8進数、`-x` は16進、`-c` は文字。'
+      ] },
+      { sub: '1.03.3', items: [
+        '標準出力のリダイレクト：**`>`、`>>`、`1>`、`1>>`**（`2>` は標準エラー、`<` は標準入力）。'
+      ] },
+      { sub: '1.03.4', items: [
+        '`fgrep`（`grep -F`）は**固定文字列**。`|` も文字扱いなので、`fgrep \'a|b\'` は a か b ではなく「a|b」という文字列を探す。'
+      ] },
+      { sub: '1.03.5', items: [
+        'vi の保存して終了：**`:wq` / `ZZ` / `:x`**（`:q!` は保存しない、`:w` は終了しない）。**`I`＝行頭から入力**、`A`＝行末、`k`＝1行上（`h`左 `j`下 `l`右）。'
+      ] },
+      { sub: '1.04.3', items: [
+        '`yum grouplist`（`yum group list`）＝グループの一覧。導入は `yum groupinstall`。'
+      ] }
+    ]
+  },
+  {
     id: 'overview', title: 'LinuC と 101 試験のあらまし',
     bullets: [
       'LinuC は LPI-Japan が運営する Linux 技術者認定。レベル1の認定には、**101 試験と 102 試験の両方**に合格する必要がある（このゲームは 101 のみ対象）。',
