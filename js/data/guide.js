@@ -248,7 +248,11 @@ window.GUIDE = [
         '`<` ＝ファイルを標準入力へ、`<<` ＝ヒアドキュメント、**`<<<` ＝ヒアストリング**（文字列を標準入力へ）、`>>` ＝追記、`2>&1` ＝標準エラーを標準出力へ。'
       ] },
       { sub: '1.01.1', items: [
-        '`scp` は **`-P`（大文字）**、`ssh` は `-p`。`authorized_keys`（サーバ側）／`known_hosts`（クライアント側）。`sshd_config`（サーバ）／`ssh_config`（クライアント）。`shutdown -h +10`、`shutdown -c` で取り消し。'
+        '`scp` は **`-P`（大文字）**、`ssh` は `-p`。`authorized_keys`（サーバ側）／`known_hosts`（クライアント側）。`sshd_config`（サーバ）／`ssh_config`（クライアント）。`shutdown -h +10`、`shutdown -c` で取り消し。',
+        '**公開鍵認証**：鍵は**ペア**。**秘密鍵はクライアントだけ**に置き（権限 `600`、`~/.ssh` は `700`）、**公開鍵（`.pub`）をサーバの `~/.ssh/authorized_keys` に追記**する（`ssh-copy-id`）。秘密鍵そのものは送られず、**秘密鍵で署名 → 公開鍵で検証**。',
+        '**ホスト側＝接続先のサーバ**、クライアント側＝接続する側。**ホスト側**：`~/.ssh/authorized_keys`（許可する公開鍵）、`/etc/ssh/sshd_config`、`/etc/ssh/ssh_host_*_key`（サーバ自身のホスト鍵）。**クライアント側**：`~/.ssh/id_rsa`（秘密鍵）、`id_rsa.pub`（公開鍵）、`~/.ssh/known_hosts`、`ssh_config`。鍵の名前は `id_` ＋ `rsa` / `ecdsa` / `ed25519`。',
+        '生成 `ssh-keygen -t ed25519`（`-b` 長さ、`-f` ファイル、`-p` パスフレーズ変更、`-l` フィンガープリント、**`-R` で known_hosts から削除**）。接続は `ssh -i 秘密鍵`、パスフレーズ入力を減らすのは `ssh-agent` ＋ `ssh-add`。サーバ側の `PasswordAuthentication no` でパスワード認証を無効化。',
+        '初回接続の「本物か？」はホスト鍵の確認 → `known_hosts` に記録。**`REMOTE HOST IDENTIFICATION HAS CHANGED` は、ホスト鍵が記録と違う**（再インストールか、なりすましの可能性）。ログインできないときは `ssh -v` で調べる。'
       ] },
       { sub: '1.01.2', items: [
         '`virsh destroy`＝強制停止（定義は残る）、`undefine`＝定義の削除、`autostart`、`list --all`。コンテナはホストの**カーネルを共有**する。`docker rm`＝コンテナ、`rmi`＝イメージ、`-p ホスト側:コンテナ側`。'
