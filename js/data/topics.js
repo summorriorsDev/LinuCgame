@@ -68,9 +68,21 @@ window.CHAPTERS = [
   { id: 0, name: '第0章', sub: '試験ガイド', icon: '🧭' },
   { id: 1, name: '第1章', sub: '基礎固め（一問一答）', icon: '📘' },
   { id: 2, name: '第2章', sub: '実戦演習（試験形式・毎回変わる問題）', icon: '⚔️' },
+  { id: 5, name: '第3章', sub: '弱点克服（パッケージ管理・ファイル操作を強化）', icon: '🎯' },
   { id: 3, name: '自作ノート', sub: '自分で追加した問題', icon: '✏️' },
   { id: 4, name: '道場', sub: '実際に打って確かめる', icon: '🖥️' }
 ];
+/* 章ごとの重み・並び順の上書き。第3章（弱点克服）は、つまずきやすい主題（パッケージ管理・ファイル操作など）を優先する。 */
+window.CH_WEIGHTS = {
+  5: {
+    '1.04.1': 4, '1.04.2': 4, '1.04.3': 4, '1.04.4': 4,
+    '1.02.1': 4, '1.02.2': 4, '1.02.3': 3, '1.02.4': 4,
+    '1.01.1': 3, '1.01.2': 3, '1.01.3': 3, '1.01.4': 3,
+    '1.03.1': 2, '1.03.2': 2, '1.03.3': 2, '1.03.4': 2, '1.03.5': 2,
+    '1.05.1': 2, '1.05.2': 2, '1.05.3': 2
+  }
+};
+window.CH_ORDER = { 5: ['1.04', '1.02', '1.01', '1.03', '1.05'] };
 (function () {
   function hash(s) {
     var h = 5381;
@@ -84,7 +96,7 @@ window.CHAPTERS = [
   }
   window.qc = function (t, q, o, a, e, hard) { add({ t: t, type: 'choice', q: q, o: o, a: a, e: e || '', hard: !!hard }); };
   window.qm = function (t, q, o, a, e, hard) { add({ t: t, type: 'multi', q: q, o: o, a: a, e: e || '', hard: !!hard }); };
-  /* qa … 「当てはまるものをすべて選べ」形式。正解の個数は表示しない（試験・Ping-t のように数が分からない） */
+  /* qa … 「当てはまるものをすべて選べ」形式。正解の個数は表示しない（本番のように数が分からない） */
   window.qa = function (t, q, o, a, e, hard) { add({ t: t, type: 'multi', hide: true, q: q, o: o, a: a, e: e || '', hard: !!hard }); };
   window.qi = function (t, q, ans, e, hard) { add({ t: t, type: 'input', q: q, ans: [].concat(ans), e: e || '', hard: !!hard }); };
   /* qg(小主題, キー, 生成関数, hard?) … 出題のたびに数値・文字列が変わる問題。

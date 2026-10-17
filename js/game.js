@@ -17,13 +17,14 @@
   var chById = {};
   CHAPTERS.forEach(function (c) { chById[c.id] = c; });
   var CH_DESC = {
-    1: '一問一答で基本を覚える章です。繰り返すと答えを覚えてしまうので、知識をつける用（1〜2周）と考えて、仕上げは第2章で。',
-    2: '試験に近い形式（出力の読み取り・誤りを選ぶ・複数選択など）と、出題のたびに数値や文字列が変わる問題の章です。実力は「初見正答率」で見ます。',
-    3: '自分で追加した問題です。他の章とは混ざりません。'
+    1: '一問一答で基本を覚える章です。繰り返すと答えを覚えてしまうので、知識をつける用（1〜2周）。仕上げは第2章・第3章で。',
+    2: '試験に近い形式（出力の読み取り、誤りを選ぶ、複数選択など）と、毎回数値や文字列が変わる問題の章です。実力は「初見正答率」で見ます。',
+    3: '自分で追加した問題です。他の章とは混ざりません。',
+    5: 'つまずきやすい主題（パッケージ管理、ファイル・ディレクトリの操作、仮想化・systemd・プロセス）を、書き下ろしの問題で強化する章です。コマンドやパスを打つ記述式も含みます。'
   };
 
   var SAVE_KEY = 'linuc101rpg.v1';
-  var PASS_RATE = 500 / 800;
+  var PASS_RATE = 480 / 800;   // 合格ラインの目安（480/800）。公式の最新情報を確認すること
 
   function defaultSave() {
     return {
@@ -172,6 +173,8 @@
     if (!chById[c] || (c === 3 && !S.custom.length)) c = 1;
     return c;
   }
+  /* 小主題の重み。章ごとに上書きできる（第3章は、苦手な主題を最優先にする） */
+  function sw(s, ch) { var o = window.CH_WEIGHTS && window.CH_WEIGHTS[ch]; return (o && o[s.id] != null) ? o[s.id] : s.w; }
   function chQs(ch) { return BANK.filter(function (q) { return q.ch === ch; }); }
   function subQs(id, ch) { return BANK.filter(function (q) { return q.t === id && q.ch === ch; }); }
   function clearKey(id, ch) { return ch === 1 ? id : ch + ':' + id; }
@@ -183,7 +186,7 @@
   }
   function overall(ch) {
     var num = 0, den = 0;
-    SUBS.forEach(function (s) { if (subQs(s.id, ch).length) { num += mastery(s.id, ch) * s.w; den += s.w; } });
+    SUBS.forEach(function (s) { if (subQs(s.id, ch).length) { num += mastery(s.id, ch) * sw(s, ch); den += sw(s, ch); } });
     return den ? num / den : 0;
   }
   function firstStats(ch) {
@@ -198,7 +201,9 @@
     var best = null, bs = -1;
     SUBS.forEach(function (s, i) {
       if (!subQs(s.id, ch).length) return;
-      var sc = s.w * (1 - mastery(s.id, ch)) - i * 0.001;
+      var ord = window.CH_ORDER && window.CH_ORDER[ch];
+      var rank = ord ? ord.indexOf(s.id.slice(0, 4)) * 100 + i : i;   // 同点のときは、章ごとの並び順（弱点が先）を優先
+      var sc = sw(s, ch) * (1 - mastery(s.id, ch)) - rank * 0.0001;
       if (sc > bs) { bs = sc; best = s; }
     });
     return best;
@@ -311,6 +316,7 @@
     var c = chById[ch], rec = recommend(ch), rv = reviewPool(ch).length;
     var fs = firstStats(ch), ov = overall(ch), total = chQs(ch).length;
     var gens = chQs(ch).filter(function (q) { return q.type === 'gen'; }).length;
+    var inputN = chQs(ch).filter(function (q) { return q.type === 'input'; }).length;
     var h = heroHTML() + tabsHTML(ch);
 
     if (!S.seenIntro) {
@@ -333,19 +339,31 @@
       var rm = mastery(rec.id, ch);
       h += '<div class="card recommend"><div class="muted small">⭐ ' + c.name + ' 最短ルートの次の一手</div>' +
         '<div style="font-weight:800;font-size:1.1rem">' + rec.mon + ' ' + rec.id + ' ' + esc(rec.name) + '</div>' +
-        '<div class="muted small">重要度 <span class="star-w">' + stars(rec.w) + '</span> ／ 習熟度 ' + pct(rm) + '%</div>' +
+        '<div class="muted small">重要度 <span class="star-w">' + stars(sw(rec, ch)) + '</span> ／ 習熟度 ' + pct(rm) + '%</div>' +
         '<div class="row"><button class="btn primary big" data-stage="' + rec.id + '">⚔️ おすすめに挑戦</button>' +
         '<button class="btn" data-memo="' + rec.id + '">📘 要点メモ</button></div></div>';
     }
 
     h += '<div class="menu">' +
       '<button class="btn" id="mRandom">🎲 ランダム修行<small>' + c.name + 'から10問</small></button>' +
+      (inputN >= 5 ? '<button class="btn" id="mFill">✍️ 記述ドリル<small>コマンド・パスを打つ（' + inputN + '問）</small></button>' : '') +
       '<button class="btn" id="mReview">📖 復習の洞窟' + (rv ? '<span class="badge">' + rv + '</span>' : '') + '<small>間違えた問題を克服</small></button>' +
       '<button class="btn" id="mMock">👹 魔王城（模擬試験）<small>' + c.name + 'から出題</small></button>' +
       '<button class="btn" id="mStats">📊 戦績・設定<small>自作問題・データ管理</small></button>' +
       '</div>';
 
-    TOPICS.forEach(function (t) {
+    if (ch === 5) {
+      h += '<div class="card"><b>🎯 この章の進め方（苦手を順番につぶす）</b><ol style="margin:6px 0 0;padding-left:20px">' +
+        '<li>第0章の「<b>🎯 弱点克服のまとめ</b>」を読む（コマンドの対応表あり）。</li>' +
+        '<li>「<b>パッケージの市場</b>」→「<b>パーミッションの森</b>」の順に、解説を読みながらステージを進める。</li>' +
+        '<li>「<b>✍️ 記述ドリル</b>」で、コマンドやパスを<b>自分で打つ</b>。</li>' +
+        '<li>間違えたら「<b>📖 復習の洞窟</b>」で解き直し、最後に「<b>👹 魔王城</b>」で<b>初見正答率</b>を確かめる。</li>' +
+        '</ol></div>';
+    }
+    var order = window.CH_ORDER && window.CH_ORDER[ch];
+    var areas = TOPICS.slice();
+    if (order) areas.sort(function (a, b) { return order.indexOf(a.id) - order.indexOf(b.id); });
+    areas.forEach(function (t) {
       var rows = t.subs.filter(function (s) { return subQs(s.id, ch).length; });
       if (!rows.length) return;
       h += '<div class="card area"><h3>' + t.icon + ' ' + esc(t.name) + ' <span class="muted small">主題' + t.id + '</span></h3>' +
@@ -354,8 +372,8 @@
         var m = mastery(s.id, ch), n = subQs(s.id, ch).length, cl = S.clears[clearKey(s.id, ch)] || 0;
         var star = '<span class="stars">' + '★'.repeat(cl) + '<span class="off">' + '★'.repeat(3 - cl) + '</span></span>';
         h += '<div class="stage"><div><div class="nm"><span class="id">' + s.id + '</span>' + s.mon + ' ' + esc(s.name) +
-          (s.w === 4 ? '<span class="tag">最優先</span>' : '') + '</div>' +
-          '<div class="meta"><span class="star-w" title="重要度">' + stars(s.w) + '</span><span>' + n + '問</span><span>習熟 ' + pct(m) + '%</span>' + star + '</div></div>' +
+          (sw(s, ch) === 4 ? '<span class="tag">' + (ch === 5 ? '苦手を克服' : '最優先') + '</span>' : '') + '</div>' +
+          '<div class="meta"><span class="star-w" title="重要度">' + stars(sw(s, ch)) + '</span><span>' + n + '問</span><span>習熟 ' + pct(m) + '%</span>' + star + '</div></div>' +
           '<div class="acts"><button class="btn sm" data-memo="' + s.id + '">📘</button>' +
           '<button class="btn sm primary" data-stage="' + s.id + '">⚔️ 挑戦</button></div>' +
           '<div class="bar mastery"><i style="width:' + pct(m) + '%"></i></div></div>';
@@ -364,8 +382,8 @@
     });
 
     h += '<details class="card tips"><summary>🧭 最短合格のコツ</summary><ul>' +
-      '<li>LinuC-1 101試験は <b>60問・90分</b>、合格目安は<b>500/800点（約62.5%）</b>。範囲は5主題・21小主題。</li>' +
-      '<li>重要度★4（最優先タグ）: 1.01.1〜1.01.3 / 1.03.1 / 1.03.3 / 1.05.2 / 1.05.3 から先に。</li>' +
+      '<li>LinuC-1 101試験は <b>60問・90分</b>。合格ラインの目安は<b>480〜500点 / 800点（約60%）</b>。範囲は5主題・21小主題。</li>' +
+      '<li>重要度★4（最優先タグ）の 1.01.1〜1.01.3 / 1.03.1 / 1.03.3 / 1.05.2 / 1.05.3 から先に。ただし<b>苦手な主題を放置しない</b>。</li>' +
       '<li>同じ問題を繰り返すと答えを覚えてしまい、点数が実力以上に出ます。<b>第2章の初見正答率</b>と模擬試験で実力を測りましょう。</li>' +
       '<li>間違えた問題は、問題文ではなく<b>「何の知識が足りなかったか」</b>で覚える。</li>' +
       '</ul>' +
@@ -382,6 +400,7 @@
     app.querySelectorAll('[data-ch]').forEach(function (b) { b.onclick = function () { S.chapter = +b.dataset.ch; save(); showHome(); }; });
     var el;
     if ((el = document.getElementById('mRandom'))) el.onclick = function () { startRandom(ch); };
+    if ((el = document.getElementById('mFill'))) el.onclick = function () { startFill(ch); };
     if ((el = document.getElementById('mReview'))) el.onclick = function () { startReview(ch); };
     if ((el = document.getElementById('mMock'))) el.onclick = function () { showMockMenu(ch); };
     if ((el = document.getElementById('mStats'))) el.onclick = function () { showStats(); };
@@ -467,8 +486,15 @@
     newBattle({ mode: 'stage', ch: ch, title: chById[ch].name + '　' + s.id + ' ' + s.name, subId: subId, queue: queue });
   }
   function startRandom(ch) {
-    var picks = weightedPick(chQs(ch), function (q) { return qWeight(q) * q.sub.w; }, 10);
+    var picks = weightedPick(chQs(ch), function (q) { return qWeight(q) * sw(q.sub, ch); }, 10);
     newBattle({ mode: 'random', ch: ch, title: '🎲 ランダム修行（' + chById[ch].name + '）', queue: picks.map(function (q) { return { q: inst(q) }; }) });
+  }
+  /* 記述ドリル：コマンド・オプション・パスを打つ問題だけを10問（未解答・苦手を優先） */
+  function startFill(ch) {
+    var pool = chQs(ch).filter(function (q) { return q.type === 'input'; });
+    if (!pool.length) { toast('この章に記述問題はありません'); return; }
+    var picks = weightedPick(pool, function (q) { return qWeight(q) * sw(q.sub, ch); }, Math.min(10, pool.length));
+    newBattle({ mode: 'fill', ch: ch, title: '✍️ 記述ドリル（' + chById[ch].name + '）', queue: picks.map(function (q) { return { q: inst(q) }; }) });
   }
   function startReview(ch) {
     var pool = reviewPool(ch);
@@ -689,7 +715,7 @@
     var fs = firstStats(ch);
     var h = '<div class="card"><h2>👹 魔王城（模擬試験）　' + c.icon + ' ' + c.name + '</h2>' +
       '<p>HPや敵演出なしの本番形式。<b>回答中は正誤を表示しません</b>。終了後に採点・分野別の結果・解説を表示します。</p>' +
-      '<p class="muted small">出題は小主題の重要度に応じた配分で、<b>まだ解いていない問題を優先</b>します。本番は60問・90分・500/800点が合格目安です。' +
+      '<p class="muted small">出題は小主題の重要度に応じた配分で、<b>まだ解いていない問題を優先</b>します。本番は60問・90分で、合格ラインの目安は480〜500/800点です。' +
       (ch === 1 ? '<br>※ 第1章は同じ問題を何度も解いていると、答えを覚えている分、点数が高く出ます。実力測定には第2章を使ってください。' : '') + '</p>' +
       '<div class="row">' + sizes.map(function (n) { return '<button class="btn big' + (n === 60 ? ' primary' : '') + '" data-n="' + n + '">' + (n === 60 ? '本番形式（60問）' : n === 40 ? '標準（40問）' : 'ミニ（20問）') + '</button>'; }).join('') + '</div>' +
       '<p class="muted small">' + c.name + 'の問題数：' + total + '問　／　これまでの初見正答率：' + (fs.n ? pct(fs.rate) + '%（' + fs.ok + '/' + fs.n + '）' : '—') + '</p>' +
@@ -710,7 +736,7 @@
     while (picked.length < n && guard++ < 5000) {
       var cand = SUBS.filter(function (s) { return bySub[s.id].length; });
       if (!cand.length) break;
-      var s = weightedPick(cand, function (x) { return x.w; }, 1)[0];
+      var s = weightedPick(cand, function (x) { return sw(x, ch); }, 1)[0];
       picked.push(bySub[s.id].pop());
     }
     newBattle({ mode: 'mock', ch: ch, title: '👹 模擬試験 ' + chById[ch].name + '（' + picked.length + '問）', queue: shuffle(picked).map(function (q) { return { q: inst(q) }; }) });
@@ -806,7 +832,7 @@
     view(h);
     beep(defeated ? SFX.ng : SFX.clear);
     document.getElementById('retry').onclick = function () {
-      if (mode === 'stage') startStage(subId, ch); else if (mode === 'random') startRandom(ch); else startReview(ch);
+      if (mode === 'stage') startStage(subId, ch); else if (mode === 'random') startRandom(ch); else if (mode === 'fill') startFill(ch); else startReview(ch);
     };
     var m = document.getElementById('memo'); if (m) m.onclick = function () { showMemo(subId, ch); };
     document.getElementById('home').onclick = showHome;
@@ -841,7 +867,7 @@
     if (S.mocks.length) {
       h += '<div class="card"><b>模擬試験の履歴</b><table class="tbl" style="margin-top:6px"><tr><th>日付</th><th>章</th><th>正解</th><th>得点</th></tr>' +
         S.mocks.slice().reverse().slice(0, 12).map(function (m) {
-          return '<tr><td>' + m.date + '</td><td>' + chById[m.ch || 1].name + '</td><td>' + m.right + '/' + m.total + '</td><td>' + m.score + ' / 800 ' + (m.score >= 500 ? '✅' : '') + '</td></tr>';
+          return '<tr><td>' + m.date + '</td><td>' + chById[m.ch || 1].name + '</td><td>' + m.right + '/' + m.total + '</td><td>' + m.score + ' / 800 ' + (m.score >= 480 ? '✅' : '') + '</td></tr>';
         }).join('') + '</table></div>';
     }
 
