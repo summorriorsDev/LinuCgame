@@ -194,8 +194,21 @@
     chQs(ch).forEach(function (q) { var s = S.q[q.id]; if (s && s.first !== undefined) { n++; ok += s.first; } });
     return { n: n, ok: ok, rate: n ? ok / n : 0 };
   }
+  /* 復習の洞窟に出す問題：間違えたことがあり、まだ「2回続けて正解」していないもの。
+     今日すでに正解した問題は、日をあけて（明日以降に）出す。同じ問題が何度も出るのを防ぐ。 */
+  function dayOf(t) {
+    var d = new Date(t);
+    return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+  }
+  function reviewPending(ch) {
+    return chQs(ch).filter(function (q) { var s = S.q[q.id]; return s && s.ng > 0 && s.box < 2; });
+  }
   function reviewPool(ch) {
-    return chQs(ch).filter(function (q) { var s = S.q[q.id]; return s && s.ng > 0 && s.box < 3; });
+    var d = today();
+    return reviewPending(ch).filter(function (q) {
+      var s = S.q[q.id];
+      return !(s.box > 0 && dayOf(s.last) === d);   // box>0 ＝直近の回答は正解
+    });
   }
   function recommend(ch) {
     var best = null, bs = -1;
@@ -347,7 +360,7 @@
     h += '<div class="menu">' +
       '<button class="btn" id="mRandom">🎲 ランダム修行<small>' + c.name + 'から10問</small></button>' +
       (inputN >= 5 ? '<button class="btn" id="mFill">✍️ 記述ドリル<small>コマンド・パスを打つ（' + inputN + '問）</small></button>' : '') +
-      '<button class="btn" id="mReview">📖 復習の洞窟' + (rv ? '<span class="badge">' + rv + '</span>' : '') + '<small>間違えた問題を克服</small></button>' +
+      '<button class="btn" id="mReview">📖 復習の洞窟' + (rv ? '<span class="badge">' + rv + '</span>' : '') + '<small>2回正解で卒業（日をあけて出題）</small></button>' +
       '<button class="btn" id="mMock">👹 魔王城（模擬試験）<small>' + c.name + 'から出題</small></button>' +
       '<button class="btn" id="mStats">📊 戦績・設定<small>自作問題・データ管理</small></button>' +
       '</div>';
@@ -498,7 +511,11 @@
   }
   function startReview(ch) {
     var pool = reviewPool(ch);
-    if (!pool.length) { toast('復習する問題はありません。いい調子！'); return; }
+    if (!pool.length) {
+      var wait = reviewPending(ch).length;
+      toast(wait ? '今日の復習は完了！ 今日正解した ' + wait + ' 問は、明日また出ます。' : '復習する問題はありません。いい調子！', 3200);
+      return;
+    }
     var picks = weightedPick(pool, function (q) { return 5 - qBox(q); }, Math.min(10, pool.length));
     newBattle({ mode: 'review', ch: ch, title: '📖 復習の洞窟（' + chById[ch].name + '）', queue: picks.map(function (q) { return { q: inst(q) }; }) });
   }
