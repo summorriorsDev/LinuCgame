@@ -251,6 +251,9 @@ window.GUIDE = [
         '`<` ＝ファイルを標準入力へ、`<<` ＝ヒアドキュメント、**`<<<` ＝ヒアストリング**（文字列を標準入力へ）、`>>` ＝追記、`2>&1` ＝標準エラーを標準出力へ。'
       ] },
       { sub: '1.01.1', items: [
+        '**基礎**：LinuC は **LPI-Japan**。レベル1は **101 と 102 の両方**に合格。Linux ＝**カーネル**（開発はリーナス・トーバルズ）、ディストリビューション＝カーネル＋ソフト＋インストーラ。ライセンスは **GPL**（派生物も公開）。Debian 系＝Debian・Ubuntu（`.deb`、apt）、RHEL 系＝AlmaLinux・Rocky（`.rpm`、dnf／yum）。',
+        '**ログイン**：仮想コンソールは `Ctrl+Alt+F2`、ログアウトは `exit`／`logout`／`Ctrl+D`、`su -`＝ログインシェルで切り替え、`visudo`＝sudoers を安全に編集、`last`＝過去のログイン履歴、`uname -r`＝カーネルのバージョン、`/etc/os-release`＝ディストリビューションの情報。',
+        '**停止・再起動**：停止 `shutdown -h now`／`systemctl poweroff`／`init 0`、**再起動 `shutdown -r now`／`systemctl reboot`／`reboot`／`init 6`**、予約 `shutdown -h +10`／`hh:mm`、取り消し `shutdown -c`、全員に通知 `wall`。',
         '`scp` は **`-P`（大文字）**、`ssh` は `-p`。`authorized_keys`（サーバ側）／`known_hosts`（クライアント側）。`sshd_config`（サーバ）／`ssh_config`（クライアント）。`shutdown -h +10`、`shutdown -c` で取り消し。',
         '**公開鍵認証**：鍵は**ペア**。**秘密鍵はクライアントだけ**に置き（権限 `600`、`~/.ssh` は `700`）、**公開鍵（`.pub`）をサーバの `~/.ssh/authorized_keys` に追記**する（`ssh-copy-id`）。秘密鍵そのものは送られず、**秘密鍵で署名 → 公開鍵で検証**。',
         '**ホスト側＝接続先のサーバ**、クライアント側＝接続する側。**ホスト側**：`~/.ssh/authorized_keys`（許可する公開鍵）、`/etc/ssh/sshd_config`、`/etc/ssh/ssh_host_*_key`（サーバ自身のホスト鍵）。**クライアント側**：`~/.ssh/id_rsa`（秘密鍵）、`id_rsa.pub`（公開鍵）、`~/.ssh/known_hosts`、`ssh_config`。鍵の名前は `id_` ＋ `rsa` / `ecdsa` / `ed25519`。',
